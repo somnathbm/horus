@@ -1,0 +1,13 @@
+discovery:
+  local:
+    - name: "      local-dev "
+      path: /data
+
+  kubernetes:
+    - name: dev-cluster
+      clusterURL: "https://e664455.eks.cluster"
+
+  aws:
+    - name: dev-account
+      accountID: "485423766756        "
+      region: us-east-1
