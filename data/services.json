@@ -1,0 +1,17 @@
+[
+    {
+        "name": "auth-service",
+        "cpu": 45,
+        "memory": 35
+    },
+    {
+        "name": "payment-service",
+        "cpu": 88,
+        "memory": 70
+    },
+    {
+        "name": "order-service",
+        "cpu": 95,
+        "memory": 82
+    }
+]

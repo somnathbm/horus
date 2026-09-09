@@ -1,0 +1,12 @@
+[
+    {
+        "dbname": "auth-db",
+        "connections": 45,
+        "diskusage": 65
+    },
+    {
+        "dbname": "payment-db",
+        "connections": 105,
+        "diskusage": 85
+    }
+]
