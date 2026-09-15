@@ -1,0 +1,10 @@
+{
+        "id": "cache123",
+        "type": "redis",
+        "name": "user-cache",
+        "spec": {
+            "url": "http://my-redis-url.com/cache123",
+            "port": 123,
+            "ttl": 80
+        }
+}

@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/somnathbm/horus/internal/config"
+	"github.com/somnathbm/horus/internal/discovery"
 )
 
 func main() {
-	// load app config
+	// 1. load app config
 	appConfigPath := os.Getenv("APP_CONFIG_PATH")
 	if appConfigPath == "" {
 		appConfigPath = "configs/application.yaml"
@@ -19,5 +22,13 @@ func main() {
 		log.Fatalf("Error: %v", err)
 	}
 
-	fmt.Println(appConfig)
+	// 2. start discovery
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	targets, err := discovery.Start(appConfig.Discovery, ctx)
+	if err != nil {
+		fmt.Printf("%v", err)
+	}
+
+	fmt.Println(targets)
 }
