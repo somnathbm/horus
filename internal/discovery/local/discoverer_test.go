@@ -287,10 +287,10 @@ func TestDiscoverer(t *testing.T) {
 			Name: "local-dev",
 			Path: "data",
 		})
-		_, err := localDiscoverer.Discover(t.Context())
+		_, err := localDiscoverer.Discover(ctx)
 
 		// assertions
-		if !errors.Is(ctx.Err(), context.Canceled) {
+		if !errors.Is(err, context.Canceled) {
 			t.Errorf("Expecting a cancelled context. Got: %v", err)
 		}
 	})
