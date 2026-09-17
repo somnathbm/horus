@@ -1,7 +1,7 @@
 discovery:
   local:
     - name: "      local-dev "
-      path: /data
+      path: /Users/somnath/Desktop/Workspace/DevOps/Go/projects/horus/data
 
   kubernetes:
     - name: dev-cluster

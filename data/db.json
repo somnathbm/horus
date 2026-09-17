@@ -1,0 +1,10 @@
+{
+        "id": "db123",
+        "type": "postgres",
+        "name": "auth-db",
+        "spec": {
+            "host": "http://some-url.com",
+            "username": "dbadmin",
+            "port": 123
+        }
+    }
