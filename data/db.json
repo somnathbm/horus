@@ -1,6 +1,6 @@
 {
         "id": "db123",
-        "typez": "postgres",
+        "type": "postgres",
         "name": "auth-db",
         "spec": {
             "host": "http://some-url.com",

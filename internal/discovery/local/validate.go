@@ -16,26 +16,26 @@ var (
 func validate(targetEntry target.Target) error {
 	targetTypes := []target.TargetType{target.HTTPTargetType, target.PostgresSQLTargetType, target.RedisTargetType, target.KafkaTargetType}
 	if targetEntry.ID == "" || targetEntry.Name == "" || targetEntry.Type == "" || !slices.Contains(targetTypes, targetEntry.Type) {
-		return fmt.Errorf("target %q: %w", targetEntry.Name, ErrInvalidTarget)
+		return fmt.Errorf("target %q - %w", targetEntry.Name, ErrInvalidTarget)
 	}
 
 	switch spec := targetEntry.Spec.(type) {
 	case target.HTTPTargetSpec:
-		if spec.Port == 0 || spec.URL == "" {
-			return fmt.Errorf("target %q: %w", targetEntry.Name, ErrInvalidTargetSpec)
+		if targetEntry.Type != target.HTTPTargetType || spec.Port == 0 || spec.URL == "" {
+			return fmt.Errorf("target %q - %w", targetEntry.Name, ErrInvalidTargetSpec)
 		}
 	case target.PostgresTargetSpec:
-		if spec.Port == 0 || spec.Host == "" || spec.Username == "" {
-			return fmt.Errorf("target %q: %w", targetEntry.Name, ErrInvalidTargetSpec)
+		if targetEntry.Type != target.PostgresSQLTargetType || spec.Port == 0 || spec.Host == "" || spec.Username == "" {
+			return fmt.Errorf("target %q - %w", targetEntry.Name, ErrInvalidTargetSpec)
 		}
 	case target.RedisTargetSpec:
-		if spec.Port == 0 || spec.URL == "" {
-			return fmt.Errorf("target %q: %w", targetEntry.Name, ErrInvalidTargetSpec)
+		if targetEntry.Type != target.RedisTargetType || spec.Port == 0 || spec.URL == "" {
+			return fmt.Errorf("target %q - %w", targetEntry.Name, ErrInvalidTargetSpec)
 		}
 	case nil:
-		return fmt.Errorf("target %q: spec is nil: %w", targetEntry.Name, ErrInvalidTargetSpec)
+		return fmt.Errorf("target %q - spec is nil: %w", targetEntry.Name, ErrInvalidTargetSpec)
 	default:
-		return fmt.Errorf("target %q: unknown spec typepec: %w", targetEntry.Name, ErrInvalidTargetSpec)
+		return fmt.Errorf("target %q - unknown spec type: %w", targetEntry.Name, ErrInvalidTargetSpec)
 	}
 	return nil
 }

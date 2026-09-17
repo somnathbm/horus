@@ -4,7 +4,7 @@
         "name": "user-cache",
         "spec": {
             "url": "http://my-redis-url.com/cache123",
-            "port": 123,
+            "ports": 123,
             "ttl": 80
         }
 }
