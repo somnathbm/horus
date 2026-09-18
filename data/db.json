@@ -5,6 +5,6 @@
         "spec": {
             "host": "http://some-url.com",
             "username": "dbadmin",
-            "port": 123
+            "port": "1234"
         }
     }
