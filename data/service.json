@@ -4,6 +4,6 @@
         "name": "auth-service",
         "spec": {
             "url": "http://my-svc-url.com/svc123",
-            "port": 0
+            "port": "8080"
         }
 }

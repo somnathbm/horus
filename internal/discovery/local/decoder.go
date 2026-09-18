@@ -12,11 +12,11 @@ var (
 	ErrUnknownTarget = errors.New("unknown target")
 )
 
-func decodeTargetSpec(rawTarget RawTarget) (target.Target, error) {
+func decodeTargetSpec(rawTarget rawTarget) (target.Target, error) {
 	switch rawTarget.Type {
 	case target.HTTPTargetType:
 		var decodedHttpSpec target.HTTPTargetSpec
-		err := StrictUnmarshal(rawTarget.Spec, &decodedHttpSpec)
+		err := strictUnmarshal(rawTarget.Spec, &decodedHttpSpec)
 		if err != nil {
 			return target.Target{}, fmt.Errorf("target %q: %w", rawTarget.Name, err)
 		}
@@ -30,7 +30,7 @@ func decodeTargetSpec(rawTarget RawTarget) (target.Target, error) {
 
 	case target.PostgresSQLTargetType:
 		var decodedPostgresSpec target.PostgresTargetSpec
-		err := StrictUnmarshal(rawTarget.Spec, &decodedPostgresSpec)
+		err := strictUnmarshal(rawTarget.Spec, &decodedPostgresSpec)
 		if err != nil {
 			return target.Target{}, fmt.Errorf("target %q: %w", rawTarget.Name, err)
 		}
@@ -44,7 +44,7 @@ func decodeTargetSpec(rawTarget RawTarget) (target.Target, error) {
 
 	case target.RedisTargetType:
 		var decodedRedisSpec target.RedisTargetSpec
-		err := StrictUnmarshal(rawTarget.Spec, &decodedRedisSpec)
+		err := strictUnmarshal(rawTarget.Spec, &decodedRedisSpec)
 		if err != nil {
 			return target.Target{}, fmt.Errorf("target %q: %w", rawTarget.Name, err)
 		}

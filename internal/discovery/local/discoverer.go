@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -17,13 +18,11 @@ import (
 // sentinel error types
 var (
 	ErrEmptyPath       = errors.New("is empty")
-	ErrEmptyDir        = errors.New("empty directory found")
 	ErrNoDirAllowed    = errors.New("directory is not allowed")
 	ErrInvalidFileType = errors.New("only json type is allowed")
-	ErrNoTargetType    = errors.New("no target type found")
 )
 
-type RawTarget struct {
+type rawTarget struct {
 	ID   string            `json:"id"`
 	Name string            `json:"name"`
 	Type target.TargetType `json:"type"`
@@ -42,10 +41,24 @@ func New(cfg config.LocalSourceConfig) *LocalDiscoverer {
 	}
 }
 
-func StrictUnmarshal(data []byte, v interface{}) error {
+func strictUnmarshal(data []byte, v interface{}) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(v)
+	// return decoder.Decode(v)
+
+	if err := decoder.Decode(v); err != nil {
+		return err // Returns syntax or unknown field errors
+	}
+
+	// Ensure no extra valid/invalid JSON or data remains
+	var extra struct{}
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("strict decoding: extra data found after object")
+		}
+		return err
+	}
+	return nil
 }
 
 func (ld *LocalDiscoverer) Discover(ctx context.Context) (discovery.DiscoveryResult, error) {
@@ -61,9 +74,9 @@ func (ld *LocalDiscoverer) Discover(ctx context.Context) (discovery.DiscoveryRes
 		}
 
 		// 2. Read directory
-		entries, err := os.ReadDir(ld.path)
-		if err != nil {
-			return discovery.DiscoveryResult{}, fmt.Errorf("%q: %w", ld.path, os.ErrPermission)
+		entries, readDirErr := os.ReadDir(ld.path)
+		if readDirErr != nil {
+			return discovery.DiscoveryResult{}, fmt.Errorf("%q: %w", ld.path, readDirErr)
 		}
 
 		// if zero-content directory
@@ -74,6 +87,11 @@ func (ld *LocalDiscoverer) Discover(ctx context.Context) (discovery.DiscoveryRes
 		// 3. read contents of directory
 		for _, entry := range entries {
 			fileName := entry.Name()
+
+			// context cancellation check
+			if err := ctx.Err(); err != nil {
+				return discvryResult, fmt.Errorf("local discovery %q: %w", ld.name, err)
+			}
 
 			// if the entry is a directory instead of a regular file
 			if entry.IsDir() {
@@ -101,43 +119,42 @@ func (ld *LocalDiscoverer) Discover(ctx context.Context) (discovery.DiscoveryRes
 
 				// 3.2 read the file
 				fileEntryPath := filepath.Join(ld.path, fileName)
-				content, err := os.ReadFile(fileEntryPath)
-				if err != nil {
-					fmt.Println("@@@@ perm error @@")
+				content, readFileErr := os.ReadFile(fileEntryPath)
+				if readFileErr != nil {
 					newFailure := discovery.DiscoveryFailure{
 						Item: fileName,
-						Err:  fmt.Errorf("%q: %w", fileName, os.ErrPermission),
+						Err:  fmt.Errorf("%q: %w", fileName, readFileErr),
 					}
 					discvryResult.Failures = append(discvryResult.Failures, newFailure)
 					continue
 				}
 
 				// parse outer structure
-				var rawTarget RawTarget
-				err = StrictUnmarshal(content, &rawTarget)
-				if err != nil {
+				var rawTarget rawTarget
+				strictDecodeErr := strictUnmarshal(content, &rawTarget)
+				if strictDecodeErr != nil {
 					newFailure := discovery.DiscoveryFailure{
 						Item: fileName,
-						Err:  fmt.Errorf("%q: %w", fileName, err),
+						Err:  fmt.Errorf("%q: %w", fileName, strictDecodeErr),
 					}
 					discvryResult.Failures = append(discvryResult.Failures, newFailure)
 					continue
 				}
 
 				// parse spec
-				decodedTarget, err := decodeTargetSpec(rawTarget)
-				if err != nil {
+				decodedTarget, strictDecodeSpecErr := decodeTargetSpec(rawTarget)
+				if strictDecodeSpecErr != nil {
 					newFailure := discovery.DiscoveryFailure{
 						Item: fileName,
-						Err:  fmt.Errorf("%q: %w", fileName, err),
+						Err:  fmt.Errorf("%q: %w", fileName, strictDecodeSpecErr),
 					}
 					discvryResult.Failures = append(discvryResult.Failures, newFailure)
 					continue
 				}
-				if err = validate(decodedTarget); err != nil {
+				if validateErr := validate(decodedTarget); validateErr != nil {
 					newFailure := discovery.DiscoveryFailure{
 						Item: fileName,
-						Err:  fmt.Errorf("%q: %w", fileName, err),
+						Err:  fmt.Errorf("%q: %w", fileName, validateErr),
 					}
 					discvryResult.Failures = append(discvryResult.Failures, newFailure)
 					continue
@@ -146,6 +163,6 @@ func (ld *LocalDiscoverer) Discover(ctx context.Context) (discovery.DiscoveryRes
 			}
 		}
 
-		return discvryResult, err
+		return discvryResult, nil
 	}
 }
