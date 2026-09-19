@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -15,6 +16,7 @@ func New(discoverers ...Discoverer) Manager {
 
 func (m Manager) Discover(ctx context.Context) (DiscoveryResult, error) {
 	var result DiscoveryResult
+	var opsErrs []error
 
 	for _, discoverer := range m.discoverers {
 		dscvryResult, dscvryErr := discoverer.Discover(ctx)
@@ -24,7 +26,7 @@ func (m Manager) Discover(ctx context.Context) (DiscoveryResult, error) {
 		}
 		// process level error
 		if dscvryErr != nil {
-			return result, fmt.Errorf("discovery manager: %w", dscvryErr)
+			opsErrs = append(opsErrs, dscvryErr)
 		}
 
 		result.Targets = append(result.Targets, dscvryResult.Targets...)
@@ -32,5 +34,5 @@ func (m Manager) Discover(ctx context.Context) (DiscoveryResult, error) {
 	}
 
 	// result can be enriched later for reporting
-	return result, nil
+	return result, errors.Join(opsErrs...)
 }
