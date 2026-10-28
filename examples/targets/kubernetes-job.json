@@ -1,0 +1,10 @@
+{
+    "id": "job-001",
+    "name": "train-job-001",
+    "type": "kubernetes-job",
+    "spec": {
+        "cluster": "local-dev",
+        "namespace": "ml-workloads",
+        "jobName": "training-demo"
+    }
+}

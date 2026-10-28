@@ -1,13 +1,13 @@
 discovery:
   local:
     - name: "      local-dev "
-      path: /Users/somnath/Desktop/Workspace/DevOps/Go/projects/horus/data
+      path: /examples/targets
 
-  kubernetes:
-    - name: dev-cluster
-      clusterURL: "https://e664455.eks.cluster"
+  # kubernetes:
+  #   - name: dev-cluster
+  #     clusterURL: "https://e664455.eks.cluster"
 
-  aws:
-    - name: dev-account
-      accountID: "485423766756        "
-      region: us-east-1
+  # aws:
+  #   - name: dev-account
+  #     accountID: "485423766756        "
+  #     region: us-east-1

@@ -1,3 +1,3 @@
-# horus - A monitoring system built with Go
+# horus - a Kubernetes-native ML workload control plane
 
 content - TODO

@@ -3,11 +3,9 @@ package target
 type TargetType string
 
 const (
-	HTTPTargetType        TargetType = "http"
-	MySQLTargetType       TargetType = "mysql"
-	PostgresSQLTargetType TargetType = "postgres"
-	RedisTargetType       TargetType = "redis"
-	KafkaTargetType       TargetType = "kafka"
+	TargetKubernetesJob TargetType = "kubernetes-job"
+	// TargetKueueWorkload TargetType = "kueue-workload"
+	// TargetRayJob        TargetType = "ray-job"
 )
 
 type TargetSpec interface {

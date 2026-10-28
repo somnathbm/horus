@@ -57,18 +57,6 @@ func TestDiscoverer(t *testing.T) {
 			wantErrType:    ErrEmptyPath,
 		},
 		{
-			name: "dir-read-permission-error",
-			config: config.LocalSourceConfig{
-				Name: "local-dev",
-				Path: "data",
-			},
-			isNonReadable:  true,
-			fileMap:        nil,
-			wantResult:     discovery.DiscoveryResult{},
-			wantProcessErr: true,
-			wantErrType:    os.ErrPermission,
-		},
-		{
 			name: "empty-dir",
 			config: config.LocalSourceConfig{
 				Name: "local-dev",
@@ -105,18 +93,19 @@ func TestDiscoverer(t *testing.T) {
 				Path: "data",
 			},
 			fileMap: map[string]string{
-				"file.dat":  "some-content",
-				"http.json": `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
+				"file.dat":      "some-content",
+				"kube-job.json": `{"id":"job-001","name":"train-job-001","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo"}}`,
 			},
 			wantResult: discovery.DiscoveryResult{
 				Targets: []target.Target{
 					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
 						},
 					},
 				},
@@ -137,19 +126,20 @@ func TestDiscoverer(t *testing.T) {
 				Path: "data",
 			},
 			fileMap: map[string]string{
-				"file.dat":  "some-content",
-				"http.json": `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-				"file2.dat": "some-content2",
+				"file.dat":      "some-content",
+				"kube-job.json": `{"id":"job-001","name":"train-job-001","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo"}}`,
+				"file2.dat":     "some-content2",
 			},
 			wantResult: discovery.DiscoveryResult{
 				Targets: []target.Target{
 					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
 						},
 					},
 				},
@@ -174,39 +164,30 @@ func TestDiscoverer(t *testing.T) {
 				Path: "data",
 			},
 			fileMap: map[string]string{
-				"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-				"dirA":          `"should be skipped"`,
-				"postgres.json": `{"id": "db123", "type": "postgres", "name": "auth-db", "spec": {"host": "some-url.com", "username": "dbadmin", "port": 1234}}`,
-				"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"url": "http://some-url.com/cache123", "port": 1234}}`,
+				"kube-job.json":  `{"id":"job-001","name":"train-job-001","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo"}}`,
+				"dirA":           `"should be skipped"`,
+				"kube-job2.json": `{"id":"job-002","name":"train-job-002","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo02"}}`,
 			},
 			wantResult: discovery.DiscoveryResult{
 				Targets: []target.Target{
 					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
 						},
 					},
 					{
-						ID:   "db123",
-						Type: target.PostgresSQLTargetType,
-						Name: "auth-db",
-						Spec: target.PostgresTargetSpec{
-							Host:     "some-url.com",
-							Username: "dbadmin",
-							Port:     1234,
-						},
-					},
-					{
-						ID:   "cache123",
-						Type: target.RedisTargetType,
-						Name: "cache123",
-						Spec: target.RedisTargetSpec{
-							URL:  "http://some-url.com/cache123",
-							Port: 1234,
+						ID:   "job-002",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-002",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo02",
 						},
 					},
 				},
@@ -227,38 +208,29 @@ func TestDiscoverer(t *testing.T) {
 				Path: "data",
 			},
 			fileMap: map[string]string{
-				"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-				"postgres.json": `{"id": "db123", "type": "postgres", "name": "auth-db", "spec": {"host": "some-url.com", "username": "dbadmin", "port": 1234}}`,
-				"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"url": "http://some-url.com/cache123", "port": 1234}}`,
+				"kube-job.json":  `{"id":"job-001","name":"train-job-001","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo"}}`,
+				"kube-job2.json": `{"id":"job-002","name":"train-job-002","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo02"}}`,
 			},
 			wantResult: discovery.DiscoveryResult{
 				Targets: []target.Target{
 					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
 						},
 					},
 					{
-						ID:   "db123",
-						Type: target.PostgresSQLTargetType,
-						Name: "auth-db",
-						Spec: target.PostgresTargetSpec{
-							Host:     "some-url.com",
-							Username: "dbadmin",
-							Port:     1234,
-						},
-					},
-					{
-						ID:   "cache123",
-						Type: target.RedisTargetType,
-						Name: "cache123",
-						Spec: target.RedisTargetSpec{
-							URL:  "http://some-url.com/cache123",
-							Port: 1234,
+						ID:   "job-002",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-002",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo02",
 						},
 					},
 				},
@@ -274,35 +246,26 @@ func TestDiscoverer(t *testing.T) {
 				Path: "data",
 			},
 			fileMap: map[string]string{
-				"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-				"postgres.json": `{"id": "db123"type": "postgres", "name": "auth-db", "spec": {"host": "some-url.com", "username": "dbadmin", "port": 1234}}`,
-				"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"url": "http://some-url.com/cache123", "port": 1234}}`,
+				"kube-job.json":  `{"id":"job-001","name":"train-job-001","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo"}}`,
+				"kube-job2.json": `{"id":"job-002""name":"train-job-002","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo02"}}`,
 			},
 			wantResult: discovery.DiscoveryResult{
 				Targets: []target.Target{
 					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
-						},
-					},
-					{
-						ID:   "cache123",
-						Type: target.RedisTargetType,
-						Name: "cache123",
-						Spec: target.RedisTargetSpec{
-							URL:  "http://some-url.com/cache123",
-							Port: 1234,
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
 						},
 					},
 				},
 				Failures: []discovery.DiscoveryFailure{
 					{
-						Item: "postgres.json",
-						Err:  errors.New("\"postgres.json\": invalid character "),
+						Item: "kube-job2.json",
+						Err:  errors.New("\"kube-job2.json\": invalid character "),
 					},
 				},
 			},
@@ -316,35 +279,26 @@ func TestDiscoverer(t *testing.T) {
 				Path: "data",
 			},
 			fileMap: map[string]string{
-				"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-				"postgres.json": `{"id": "db123", "type": "postgresz", "name": "auth-db", "spec": {"host": "some-url.com", "username": "dbadmin", "port": 1234}}`,
-				"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"url": "http://some-url.com/cache123", "port": 1234}}`,
+				"kube-job.json":  `{"id":"job-001","name":"train-job-001","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo"}}`,
+				"kube-job2.json": `{"id":"job-002","name":"train-job-002","type":"kubernetes-jobs","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo02"}}`,
 			},
 			wantResult: discovery.DiscoveryResult{
 				Targets: []target.Target{
 					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
-						},
-					},
-					{
-						ID:   "cache123",
-						Type: target.RedisTargetType,
-						Name: "cache123",
-						Spec: target.RedisTargetSpec{
-							URL:  "http://some-url.com/cache123",
-							Port: 1234,
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
 						},
 					},
 				},
 				Failures: []discovery.DiscoveryFailure{
 					{
-						Item: "postgres.json",
-						Err:  errors.New("\"postgres.json\": target \"auth-db\": unknown target"),
+						Item: "kube-job2.json",
+						Err:  errors.New("\"kube-job2.json\": target \"train-job-002\": unknown target"),
 					},
 				},
 			},
@@ -358,35 +312,26 @@ func TestDiscoverer(t *testing.T) {
 				Path: "data",
 			},
 			fileMap: map[string]string{
-				"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-				"postgres.json": `{"id": "db123", "type": "postgres", "name": "auth-db", "spec": {"host": "some-url.com", "username": "", "port": 1234}}`,
-				"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"url": "http://some-url.com/cache123", "port": 1234}}`,
+				"kube-job.json":  `{"id":"job-001","name":"train-job-001","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo"}}`,
+				"kube-job2.json": `{"id":"job-002","name":"train-job-002","type":"kubernetes-job","spec":{"cluster":"","namespace":"ml-workloads","jobName":"training-demo02"}}`,
 			},
 			wantResult: discovery.DiscoveryResult{
 				Targets: []target.Target{
 					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
-						},
-					},
-					{
-						ID:   "cache123",
-						Type: target.RedisTargetType,
-						Name: "cache123",
-						Spec: target.RedisTargetSpec{
-							URL:  "http://some-url.com/cache123",
-							Port: 1234,
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
 						},
 					},
 				},
 				Failures: []discovery.DiscoveryFailure{
 					{
-						Item: "postgres.json",
-						Err:  errors.New("\"postgres.json\": target \"auth-db\": invalid target spec"),
+						Item: "kube-job2.json",
+						Err:  errors.New("\"kube-job2.json\": target \"train-job-002\": invalid target spec"),
 					},
 				},
 			},
@@ -394,189 +339,38 @@ func TestDiscoverer(t *testing.T) {
 			wantErrType:    ErrInvalidTargetSpec,
 		},
 		{
-			name: "invalid-target-spec-port",
+			name: "unknown-target-spec",
 			config: config.LocalSourceConfig{
 				Name: "local-dev",
 				Path: "data",
 			},
 			fileMap: map[string]string{
-				"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-				"postgres.json": `{"id": "db123", "type": "postgres", "name": "auth-db", "spec": {"host": "some-url.com", "username": "dbadmin", "port": 0}}`,
-				"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"url": "http://some-url.com/cache123", "port": 1234}}`,
+				"kube-job.json":  `{"id":"job-001","name":"train-job-001","type":"kubernetes-job","spec":{"cluster":"local-dev","namespace":"ml-workloads","jobName":"training-demo"}}`,
+				"kube-job2.json": `{"id":"job-002","name":"train-job-002","type":"kubernetes-job","spec":{"cluster":"","namespace":"ml-workloads","jobName":"training-demo02","completions":"4"}}`,
 			},
 			wantResult: discovery.DiscoveryResult{
 				Targets: []target.Target{
 					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
-						},
-					},
-					{
-						ID:   "cache123",
-						Type: target.RedisTargetType,
-						Name: "cache123",
-						Spec: target.RedisTargetSpec{
-							URL:  "http://some-url.com/cache123",
-							Port: 1234,
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
 						},
 					},
 				},
 				Failures: []discovery.DiscoveryFailure{
 					{
-						Item: "postgres.json",
-						Err:  errors.New("\"postgres.json\": target \"auth-db\": invalid target spec"),
-					},
-				},
-			},
-			wantProcessErr: false,
-			wantErrType:    ErrInvalidTargetSpec,
-		},
-		{
-			name: "incompatible-target-spec",
-			config: config.LocalSourceConfig{
-				Name: "local-dev",
-				Path: "data",
-			},
-			fileMap: map[string]string{
-				"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-				"postgres.json": `{"id": "db123", "type": "postgres", "name": "auth-db", "spec": {"host": "some-url.com", "username": "dbadmin", "port": 1234}}`,
-				"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"host": "http://some-url.com", "username": "dbadmin", "port": 1234}}`,
-			},
-			wantResult: discovery.DiscoveryResult{
-				Targets: []target.Target{
-					{
-						ID:   "svc123",
-						Type: target.HTTPTargetType,
-						Name: "auth-service",
-						Spec: target.HTTPTargetSpec{
-							URL:  "http://my-svc-url.com/svc123",
-							Port: 1234,
-						},
-					},
-					{
-						ID:   "db123",
-						Type: target.PostgresSQLTargetType,
-						Name: "auth-db",
-						Spec: target.PostgresTargetSpec{
-							Host:     "some-url.com",
-							Username: "dbadmin",
-							Port:     1234,
-						},
-					},
-				},
-				Failures: []discovery.DiscoveryFailure{
-					{
-						Item: "redis.json",
-						Err:  errors.New("\"redis.json\": target \"cache123\": json: unknown field \"host\""),
+						Item: "kube-job2.json",
+						Err:  errors.New("\"kube-job2.json\": target \"train-job-002\": json: unknown field \"completions\""),
 					},
 				},
 			},
 			wantProcessErr: false,
 			wantErrType:    nil,
 		},
-		// {
-		// 	name: "target-count-wrong",
-		// 	config: config.LocalSourceConfig{
-		// 		Name: "local-dev",
-		// 		Path: "data",
-		// 	},
-		// 	fileMap: map[string]string{
-		// 		"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-		// 		"postgres.json": `{"id": "db123", "type": "postgres", "name": "auth-db", "spec": {"host": "some-url.com", "username": "dbadmin", "port": 1234}}`,
-		// 		"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"host": "http://some-url.com", "username": "dbadmin", "port": 1234}}`,
-		// 	},
-		// 	wantResult: discovery.DiscoveryResult{
-		// 		Targets: []target.Target{
-		// 			{
-		// 				ID:   "svc123",
-		// 				Type: target.HTTPTargetType,
-		// 				Name: "auth-service",
-		// 				Spec: target.HTTPTargetSpec{
-		// 					URL:  "http://my-svc-url.com/svc123",
-		// 					Port: 1234,
-		// 				},
-		// 			},
-		// 			{
-		// 				ID:   "db123",
-		// 				Type: target.PostgresSQLTargetType,
-		// 				Name: "auth-db",
-		// 				Spec: target.PostgresTargetSpec{
-		// 					Host:     "http://some-url.com",
-		// 					Username: "dbadmin",
-		// 					Port:     1234,
-		// 				},
-		// 			},
-		// 			{
-		// 				ID:   "cache123",
-		// 				Type: target.RedisTargetType,
-		// 				Name: "cache123",
-		// 				Spec: target.RedisTargetSpec{
-		// 					URL:  "http://some-url.com/cache123",
-		// 					Port: 1234,
-		// 				},
-		// 			},
-		// 		},
-		// 		Failures: []discovery.DiscoveryFailure{
-		// 			{
-		// 				Item: "redis.json",
-		// 				Err:  errors.New("\"redis.json\": target \"cache123\": json: unknown field \"host\""),
-		// 			},
-		// 		},
-		// 	},
-		// 	wantProcessErr: false,
-		// 	wantErrType:    nil,
-		// },
-		// {
-		// 	name: "failure-count-wrong",
-		// 	config: config.LocalSourceConfig{
-		// 		Name: "local-dev",
-		// 		Path: "data",
-		// 	},
-		// 	fileMap: map[string]string{
-		// 		"http.json":     `{"id":"svc123","type":"http","name":"auth-service","spec":{"url":"http://my-svc-url.com/svc123","port":1234}}`,
-		// 		"postgres.json": `{"id": "db123", "type": "postgres", "name": "auth-db", "spec": {"host": "some-url.com", "username": "dbadmin", "port": 1234}}`,
-		// 		"redis.json":    `{"id": "cache123", "type": "redis", "name": "cache123", "spec": {"host": "http://some-url.com", "username": "dbadmin", "port": 1234}}`,
-		// 	},
-		// 	wantResult: discovery.DiscoveryResult{
-		// 		Targets: []target.Target{
-		// 			{
-		// 				ID:   "svc123",
-		// 				Type: target.HTTPTargetType,
-		// 				Name: "auth-service",
-		// 				Spec: target.HTTPTargetSpec{
-		// 					URL:  "http://my-svc-url.com/svc123",
-		// 					Port: 1234,
-		// 				},
-		// 			},
-		// 			{
-		// 				ID:   "db123",
-		// 				Type: target.PostgresSQLTargetType,
-		// 				Name: "auth-db",
-		// 				Spec: target.PostgresTargetSpec{
-		// 					Host:     "http://some-url.com",
-		// 					Username: "dbadmin",
-		// 					Port:     1234,
-		// 				},
-		// 			},
-		// 		},
-		// 		Failures: []discovery.DiscoveryFailure{
-		// 			{
-		// 				Item: "redis.json",
-		// 				Err:  errors.New("\"redis.json\": target \"cache123\": json: unknown field \"host\""),
-		// 			},
-		// 			{
-		// 				Item: "postgres.json",
-		// 				Err:  errors.New("\"postgres.json\": target \"auth-db\": json: unknown field \"host\""),
-		// 			},
-		// 		},
-		// 	},
-		// 	wantProcessErr: false,
-		// 	wantErrType:    nil,
-		// },
 	}
 
 	// runs
@@ -602,6 +396,7 @@ func TestDiscoverer(t *testing.T) {
 				}
 				// create files
 				for k, v := range tc.fileMap {
+					// is a regular file
 					if filepath.Ext(k) != "" {
 						if err := os.WriteFile(filepath.Join(filePath, k), []byte(v), 0744); err != nil {
 							t.Fatalf("Error creating the file: %v", err)

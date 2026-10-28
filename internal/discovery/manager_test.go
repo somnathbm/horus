@@ -36,8 +36,8 @@ func (d countingDiscoverer) Discover(ctx context.Context) (DiscoveryResult, erro
 // sentinel errors
 var (
 	errFatal         = errors.New("fatal error")
-	errInvalidSchema = errors.New("target \"cache123\": invalid schema")
-	errUnknownField  = errors.New("target \"auth-db\": json: unknown field \"url\"")
+	errInvalidSchema = errors.New("invalid schema in target")
+	errUnknownField  = errors.New("unknown field in target json")
 	errAWS           = errors.New("aws fatal error")
 	errKubernetes    = errors.New("kubernetes fatal error")
 )
@@ -47,10 +47,16 @@ func TestManager(t *testing.T) {
 	discovererNoFailure := mockDiscoverer{
 		result: DiscoveryResult{
 			Targets: []target.Target{
-				{ID: "svc123", Name: "auth-service", Type: target.HTTPTargetType, Spec: target.HTTPTargetSpec{
-					URL:  "http://v1.api.example.com/svcs/svc123",
-					Port: 8080,
-				}},
+				{
+					ID:   "job-001",
+					Type: target.TargetKubernetesJob,
+					Name: "train-job-001",
+					Spec: target.KubernetesJobSpec{
+						Cluster:   "local-dev",
+						Namespace: "ml-workloads",
+						JobName:   "training-demo",
+					},
+				},
 			},
 		},
 	}
@@ -59,14 +65,19 @@ func TestManager(t *testing.T) {
 	discovererWithFailure := mockDiscoverer{
 		result: DiscoveryResult{
 			Targets: []target.Target{
-				{ID: "db123", Name: "payment-db", Type: target.PostgresSQLTargetType, Spec: target.PostgresTargetSpec{
-					Host:     "example.db.com",
-					Username: "dbadmin",
-					Port:     8080,
-				}},
+				{
+					ID:   "job-002-fail",
+					Type: target.TargetKubernetesJob,
+					Name: "train-job-002",
+					Spec: target.KubernetesJobSpec{
+						Cluster:   "local-staging",
+						Namespace: "ml-workloads",
+						JobName:   "training-demo-02",
+					},
+				},
 			},
 			Failures: []DiscoveryFailure{
-				{Item: "redis.json", Err: errInvalidSchema},
+				{Item: "kube-job2.json", Err: errInvalidSchema},
 			},
 		},
 	}
@@ -75,7 +86,7 @@ func TestManager(t *testing.T) {
 	discovererNoTarget := mockDiscoverer{
 		result: DiscoveryResult{
 			Failures: []DiscoveryFailure{
-				{Item: "postgres.json", Err: errUnknownField},
+				{Item: "kube-job.json", Err: errUnknownField},
 			},
 		},
 	}
@@ -90,7 +101,7 @@ func TestManager(t *testing.T) {
 	discovererWithResultWithError := mockDiscoverer{
 		result: DiscoveryResult{
 			Failures: []DiscoveryFailure{
-				{Item: "postgres.json", Err: errUnknownField},
+				{Item: "kube-job.json", Err: errUnknownField},
 			},
 		},
 		err: errFatal,
@@ -122,10 +133,16 @@ func TestManager(t *testing.T) {
 			discoverers: []Discoverer{discovererNoFailure},
 			wantResult: DiscoveryResult{
 				Targets: []target.Target{
-					{ID: "svc123", Name: "auth-service", Type: target.HTTPTargetType, Spec: target.HTTPTargetSpec{
-						URL:  "http://v1.api.example.com/svcs/svc123",
-						Port: 8080,
-					}},
+					{
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
+						},
+					},
 				},
 			},
 		},
@@ -134,18 +151,29 @@ func TestManager(t *testing.T) {
 			discoverers: []Discoverer{discovererNoFailure, discovererWithFailure},
 			wantResult: DiscoveryResult{
 				Targets: []target.Target{
-					{ID: "svc123", Name: "auth-service", Type: target.HTTPTargetType, Spec: target.HTTPTargetSpec{
-						URL:  "http://v1.api.example.com/svcs/svc123",
-						Port: 8080,
-					}},
-					{ID: "db123", Name: "payment-db", Type: target.PostgresSQLTargetType, Spec: target.PostgresTargetSpec{
-						Host:     "example.db.com",
-						Username: "dbadmin",
-						Port:     8080,
-					}},
+					{
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
+						},
+					},
+					{
+						ID:   "job-002-fail",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-002",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-staging",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo-02",
+						},
+					},
 				},
 				Failures: []DiscoveryFailure{
-					{Item: "redis.json", Err: errInvalidSchema},
+					{Item: "kube-job2.json", Err: errInvalidSchema},
 				},
 			},
 		},
@@ -154,7 +182,7 @@ func TestManager(t *testing.T) {
 			discoverers: []Discoverer{discovererNoTarget},
 			wantResult: DiscoveryResult{
 				Failures: []DiscoveryFailure{
-					{Item: "postgres.json", Err: errUnknownField},
+					{Item: "kube-job.json", Err: errUnknownField},
 				},
 			},
 		},
@@ -163,10 +191,16 @@ func TestManager(t *testing.T) {
 			discoverers: []Discoverer{discovererNoFailure, discovererWithError},
 			wantResult: DiscoveryResult{
 				Targets: []target.Target{
-					{ID: "svc123", Name: "auth-service", Type: target.HTTPTargetType, Spec: target.HTTPTargetSpec{
-						URL:  "http://v1.api.example.com/svcs/svc123",
-						Port: 8080,
-					}},
+					{
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
+						},
+					},
 				},
 			},
 			fatalErrors: []error{errFatal},
@@ -176,13 +210,19 @@ func TestManager(t *testing.T) {
 			discoverers: []Discoverer{discovererWithError, discovererWithResultWithError, discovererNoFailure},
 			wantResult: DiscoveryResult{
 				Targets: []target.Target{
-					{ID: "svc123", Name: "auth-service", Type: target.HTTPTargetType, Spec: target.HTTPTargetSpec{
-						URL:  "http://v1.api.example.com/svcs/svc123",
-						Port: 8080,
-					}},
+					{
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
+						},
+					},
 				},
 				Failures: []DiscoveryFailure{
-					{Item: "postgres.json", Err: errUnknownField},
+					{Item: "kube-job.json", Err: errUnknownField},
 				},
 			},
 			fatalErrors: []error{errFatal},
@@ -192,10 +232,16 @@ func TestManager(t *testing.T) {
 			discoverers: []Discoverer{discovererNoFailure, discovererAWSWithError, discovererKubernetesWithError},
 			wantResult: DiscoveryResult{
 				Targets: []target.Target{
-					{ID: "svc123", Name: "auth-service", Type: target.HTTPTargetType, Spec: target.HTTPTargetSpec{
-						URL:  "http://v1.api.example.com/svcs/svc123",
-						Port: 8080,
-					}},
+					{
+						ID:   "job-001",
+						Type: target.TargetKubernetesJob,
+						Name: "train-job-001",
+						Spec: target.KubernetesJobSpec{
+							Cluster:   "local-dev",
+							Namespace: "ml-workloads",
+							JobName:   "training-demo",
+						},
+					},
 				},
 			},
 			fatalErrors: []error{errKubernetes, errAWS},
@@ -242,6 +288,11 @@ func TestManager(t *testing.T) {
 			if len(tc.wantResult.Failures) != len(gotDscvrResult.Failures) {
 				t.Errorf("expected failure count to be: %v, got: %v", len(tc.wantResult.Failures), len(gotDscvrResult.Failures))
 			}
+
+			// TODO: later
+			// if len(tc.fatalErrors) == 0 {
+			// 	if err == nil {}
+			// }
 
 			// targets assertions
 			if !slices.Equal(tc.wantResult.Targets, gotDscvrResult.Targets) {

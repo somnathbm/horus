@@ -14,9 +14,9 @@ var (
 
 func decodeTargetSpec(rawTarget rawTarget) (target.Target, error) {
 	switch rawTarget.Type {
-	case target.HTTPTargetType:
-		var decodedHttpSpec target.HTTPTargetSpec
-		err := strictUnmarshal(rawTarget.Spec, &decodedHttpSpec)
+	case target.TargetKubernetesJob:
+		var decodedKubernetesJobSpec target.KubernetesJobSpec
+		err := strictUnmarshal(rawTarget.Spec, &decodedKubernetesJobSpec)
 		if err != nil {
 			return target.Target{}, fmt.Errorf("target %q: %w", rawTarget.Name, err)
 		}
@@ -25,35 +25,7 @@ func decodeTargetSpec(rawTarget rawTarget) (target.Target, error) {
 			ID:   strings.TrimSpace(rawTarget.ID),
 			Type: rawTarget.Type,
 			Name: strings.TrimSpace(rawTarget.Name),
-			Spec: decodedHttpSpec,
-		}, nil
-
-	case target.PostgresSQLTargetType:
-		var decodedPostgresSpec target.PostgresTargetSpec
-		err := strictUnmarshal(rawTarget.Spec, &decodedPostgresSpec)
-		if err != nil {
-			return target.Target{}, fmt.Errorf("target %q: %w", rawTarget.Name, err)
-		}
-		// assemble target
-		return target.Target{
-			ID:   strings.TrimSpace(rawTarget.ID),
-			Type: rawTarget.Type,
-			Name: strings.TrimSpace(rawTarget.Name),
-			Spec: decodedPostgresSpec,
-		}, nil
-
-	case target.RedisTargetType:
-		var decodedRedisSpec target.RedisTargetSpec
-		err := strictUnmarshal(rawTarget.Spec, &decodedRedisSpec)
-		if err != nil {
-			return target.Target{}, fmt.Errorf("target %q: %w", rawTarget.Name, err)
-		}
-		// assemble target
-		return target.Target{
-			ID:   strings.TrimSpace(rawTarget.ID),
-			Type: rawTarget.Type,
-			Name: strings.TrimSpace(rawTarget.Name),
-			Spec: decodedRedisSpec,
+			Spec: decodedKubernetesJobSpec,
 		}, nil
 	default:
 		return target.Target{}, fmt.Errorf("target %q: %w", rawTarget.Name, ErrUnknownTarget)
