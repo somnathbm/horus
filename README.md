@@ -1,3 +1,6 @@
-# horus - a Kubernetes-native ML workload control plane
+# Horus - a Kubernetes-native ML workload control plane
 
-content - TODO
+![horus logo](./docs/horus_logo.png)
+
+
+## content - TODO
