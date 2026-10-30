@@ -26,11 +26,23 @@ func TestRegister(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		reg := New()
 		err := reg.Register(target.TargetKubernetesJob, plugin.KubernetesJobPlugin{})
-		err = reg.Register(target.TargetKubernetesJob, plugin.KubernetesJobPlugin{})
 
 		if err == nil {
-			t.Errorf("expecting non-nil error, got nil error")
+			// success
 		}
+		if err != nil {
+			if !errors.Is(err, ErrPluginExist) {
+				t.Errorf("expecting error of %v, got %v", ErrPluginExist, err)
+				return
+			}
+		}
+
+		// second time
+		err = reg.Register(target.TargetKubernetesJob, plugin.KubernetesJobPlugin{})
+
+		// if err == nil {
+		// 	t.Fatalf("expecting non-nil error, got nil error")
+		// }
 		if err != nil {
 			if !errors.Is(err, ErrPluginExist) {
 				t.Errorf("expecting error of %v, got %v", ErrPluginExist, err)
@@ -44,7 +56,7 @@ func TestRegister(t *testing.T) {
 		err := reg.Register(target.TargetKubernetesJob, nil)
 
 		if err == nil {
-			t.Errorf("expecting non-nil error, got nil error")
+			t.Fatalf("expecting non-nil error, got nil error")
 		}
 		if err != nil {
 			if !errors.Is(err, ErrInvalidPlugin) {

@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	ErrPluginExist    = errors.New("plugin already exist")
-	ErrPluginNotFound = errors.New("plugin not found")
-	ErrInvalidPlugin  = errors.New("invalid plugin")
-	ErrNoTarget       = errors.New("no target found")
+	ErrPluginExist       = errors.New("plugin already exist")
+	ErrPluginNotFound    = errors.New("plugin not found")
+	ErrInvalidPlugin     = errors.New("invalid plugin")
+	ErrInvalidTargetType = errors.New("no target found")
 )
 
 type Registry struct {
@@ -27,7 +27,7 @@ func New() *Registry {
 
 func (r *Registry) Register(key target.TargetType, p plugin.Plugin) error {
 	if key == "" {
-		return fmt.Errorf("err: %w", ErrNoTarget)
+		return fmt.Errorf("err: %w", ErrInvalidTargetType)
 	}
 
 	if p == nil {
@@ -43,7 +43,7 @@ func (r *Registry) Register(key target.TargetType, p plugin.Plugin) error {
 
 func (r *Registry) Get(key target.TargetType) (plugin.Plugin, error) {
 	if key == "" {
-		return nil, fmt.Errorf("err: %w", ErrNoTarget)
+		return nil, fmt.Errorf("err: %w", ErrInvalidTargetType)
 	}
 
 	if _, ok := r.plugins[key]; ok {
