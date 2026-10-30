@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/somnathbm/horus/internal/health"
 	"github.com/somnathbm/horus/internal/target"
@@ -35,7 +36,7 @@ func (p KubernetesJobPlugin) Check(ctx context.Context, t target.Target) (health
 	switch kubeJobSpec := t.Spec.(type) {
 	case target.KubernetesJobSpec:
 		// if spec required fields are missing
-		if kubeJobSpec.Cluster == "" || kubeJobSpec.Namespace == "" || kubeJobSpec.JobName == "" {
+		if strings.TrimSpace(kubeJobSpec.Cluster) == "" || strings.TrimSpace(kubeJobSpec.Namespace) == "" || strings.TrimSpace(kubeJobSpec.JobName) == "" {
 			return health.WorkloadStatus{}, fmt.Errorf("target %v contains %w", t.Name, ErrInvalidTargetSpec)
 		}
 		return health.WorkloadStatus{
