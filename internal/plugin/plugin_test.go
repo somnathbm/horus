@@ -49,7 +49,7 @@ func TestPlugin(t *testing.T) {
 			wantError: ErrInvalidTargetSpec,
 		},
 		{
-			name: "wrong-concrete-spec",
+			name: "empty-concrete-spec",
 			target: target.Target{
 				ID:   "job-003",
 				Name: "test-job-003",
@@ -101,14 +101,27 @@ func TestPlugin(t *testing.T) {
 			kubeJobPlugin := KubernetesJobPlugin{}
 			status, err := kubeJobPlugin.Check(t.Context(), tc.target)
 
-			if err != nil {
+			// if error is desired
+			if tc.wantError != nil {
+				// explicitly assert of nil error
+				if err == nil {
+					t.Errorf("expecting error: %v, but got %v", tc.wantError, err)
+				}
+
+				// assertion on the errors
 				if !errors.Is(err, tc.wantError) {
 					t.Errorf("expecting error %v, got %v", tc.wantError, err)
 				}
-			} else {
-				if !reflect.DeepEqual(tc.wantStatus, status) {
-					t.Errorf("expecting status %v, got %v", tc.wantStatus, status)
-				}
+			}
+
+			// if error is not desired, but error is ocurred
+			if err != nil && tc.wantError == nil {
+				t.Errorf("expecting nil error got %v", err)
+			}
+
+			// if desired and actual health status differs
+			if !reflect.DeepEqual(tc.wantStatus, status) {
+				t.Errorf("expecting status %v, got %v", tc.wantStatus, status)
 			}
 
 		})
