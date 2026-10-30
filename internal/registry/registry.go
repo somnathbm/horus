@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -13,7 +12,7 @@ var (
 	ErrPluginExist    = errors.New("plugin already exist")
 	ErrPluginNotFound = errors.New("plugin not found")
 	ErrInvalidPlugin  = errors.New("invalid plugin")
-	ErrNoTarget = errors.New("no target found")
+	ErrNoTarget       = errors.New("no target found")
 )
 
 type Registry struct {
@@ -26,9 +25,9 @@ func New() *Registry {
 	}
 }
 
-func (r *Registry) Register(ctx context.Context, key target.TargetType, p plugin.Plugin) error {
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("target \"%v\" with err: %w", key, err)
+func (r *Registry) Register(key target.TargetType, p plugin.Plugin) error {
+	if key == "" {
+		return fmt.Errorf("err: %w", ErrNoTarget)
 	}
 
 	if p == nil {
@@ -42,11 +41,7 @@ func (r *Registry) Register(ctx context.Context, key target.TargetType, p plugin
 	return fmt.Errorf("%w for key %v", ErrPluginExist, key)
 }
 
-func (r *Registry) Get(ctx context.Context, key target.TargetType) (plugin.Plugin, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("target \"%v\" with err: %w", key, err)
-	}
-
+func (r *Registry) Get(key target.TargetType) (plugin.Plugin, error) {
 	if key == "" {
 		return nil, fmt.Errorf("err: %w", ErrNoTarget)
 	}
@@ -54,6 +49,6 @@ func (r *Registry) Get(ctx context.Context, key target.TargetType) (plugin.Plugi
 	if _, ok := r.plugins[key]; ok {
 		return r.plugins[key], nil
 	}
-	
+
 	return nil, fmt.Errorf("%w for key %v", ErrPluginNotFound, key)
 }
