@@ -31,7 +31,7 @@ func TestPlugin(t *testing.T) {
 		wantStatus health.WorkloadStatus
 	}{
 		{
-			name: "wrong-target",
+			name: "unregistered-target",
 			target: target.Target{
 				ID:   "job-001",
 				Name: "test-job-001",
@@ -44,7 +44,7 @@ func TestPlugin(t *testing.T) {
 			target: target.Target{
 				ID:   "job-002",
 				Name: "test-job-002",
-				Type: "kubernetes-job",
+				Type: target.TargetKubernetesJob,
 			},
 			wantError: ErrInvalidTargetSpec,
 		},
@@ -53,7 +53,7 @@ func TestPlugin(t *testing.T) {
 			target: target.Target{
 				ID:   "job-003",
 				Name: "test-job-003",
-				Type: "kubernetes-job",
+				Type: target.TargetKubernetesJob,
 				Spec: target.KubernetesJobSpec{
 					Cluster:   "",
 					Namespace: "",
@@ -63,11 +63,25 @@ func TestPlugin(t *testing.T) {
 			wantError: ErrInvalidTargetSpec,
 		},
 		{
+			name: "whitespaced-concrete-spec",
+			target: target.Target{
+				ID:   "job-003",
+				Name: "test-job-001",
+				Type: target.TargetKubernetesJob,
+				Spec: target.KubernetesJobSpec{
+					Cluster:   "   ",
+					Namespace: "",
+					JobName:   "  ",
+				},
+			},
+			wantError: ErrInvalidTargetSpec,
+		},
+		{
 			name: "missing-required-field-spec",
 			target: target.Target{
 				ID:   "job-004",
 				Name: "test-job-004",
-				Type: "kubernetes-job",
+				Type: target.TargetKubernetesJob,
 				Spec: target.KubernetesJobSpec{
 					Cluster:   "local-dev",
 					Namespace: "ml-workloads",
@@ -80,7 +94,7 @@ func TestPlugin(t *testing.T) {
 			target: target.Target{
 				ID:   "job-005",
 				Name: "test-job-005",
-				Type: "kubernetes-job",
+				Type: target.TargetKubernetesJob,
 				Spec: target.KubernetesJobSpec{
 					Cluster:   "local-dev",
 					Namespace: "ml-workloads",
@@ -105,18 +119,19 @@ func TestPlugin(t *testing.T) {
 			if tc.wantError != nil {
 				// explicitly assert of nil error
 				if err == nil {
-					t.Errorf("expecting error: %v, but got %v", tc.wantError, err)
+					t.Fatalf("expecting error: %v, but got %v", tc.wantError, err)
 				}
 
 				// assertion on the errors
 				if !errors.Is(err, tc.wantError) {
 					t.Errorf("expecting error %v, got %v", tc.wantError, err)
 				}
+				return
 			}
 
 			// if error is not desired, but error is ocurred
-			if err != nil && tc.wantError == nil {
-				t.Errorf("expecting nil error got %v", err)
+			if err != nil {
+				t.Fatalf("expecting nil error got %v", err)
 			}
 
 			// if desired and actual health status differs
