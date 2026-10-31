@@ -50,10 +50,12 @@ func TestRegister(t *testing.T) {
 		reg := New()
 		err := reg.Register(target.TargetKubernetesJob, nil)
 
-		if err != nil {
-			if !errors.Is(err, ErrInvalidPlugin) {
-				t.Errorf("expecting error of %v, got %v", ErrInvalidPlugin, err)
-			}
+		if err == nil {
+			t.Fatalf("expecting non-nil error, but got nil error")
+		}
+
+		if !errors.Is(err, ErrInvalidPlugin) {
+			t.Errorf("expecting error of %v, got %v", ErrInvalidPlugin, err)
 		}
 	})
 
@@ -62,10 +64,12 @@ func TestRegister(t *testing.T) {
 		reg := New()
 		err := reg.Register("", nil)
 
-		if err != nil {
-			if !errors.Is(err, ErrInvalidTargetType) {
-				t.Errorf("expecting error of %v, got %v", ErrInvalidTargetType, err)
-			}
+		if err == nil {
+			t.Fatalf("expecting non-nil error, but got nil error")
+		}
+
+		if !errors.Is(err, ErrInvalidTargetType) {
+			t.Errorf("expecting error of %v, got %v", ErrInvalidTargetType, err)
 		}
 	})
 }
@@ -75,10 +79,13 @@ func TestGet(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		reg := New()
 		err := reg.Register(target.TargetKubernetesJob, plugin.KubernetesJobPlugin{})
-		_, err = reg.Get(target.TargetKubernetesJob)
+		rsltPlugin, err := reg.Get(target.TargetKubernetesJob)
 
 		if err == nil {
 			// success
+			if rsltPlugin != nil {
+				// success
+			}
 		}
 		if err != nil {
 			t.Errorf("expecting nil error, but got error %v", err)
@@ -88,7 +95,7 @@ func TestGet(t *testing.T) {
 	// unregistered target type
 	t.Run("unregistered-target-type", func(t *testing.T) {
 		reg := New()
-		_, err := reg.Get("kqueue-workload")
+		_, err := reg.Get(target.TargetType("kqueue-workload"))
 
 		if err == nil {
 			t.Errorf("expecting non-nil error, but got nil error")

@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	ErrPluginExists       = errors.New("plugin already exist")
+	ErrPluginExists       = errors.New("plugin already exists")
 	ErrPluginNotFound    = errors.New("plugin not found")
 	ErrInvalidPlugin     = errors.New("invalid plugin")
-	ErrInvalidTargetType = errors.New("no target found")
+	ErrInvalidTargetType = errors.New("invalid target type")
 )
 
 type Registry struct {
