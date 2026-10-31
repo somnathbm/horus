@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	ErrPluginExist       = errors.New("plugin already exist")
+	ErrPluginExists       = errors.New("plugin already exist")
 	ErrPluginNotFound    = errors.New("plugin not found")
 	ErrInvalidPlugin     = errors.New("invalid plugin")
 	ErrInvalidTargetType = errors.New("no target found")
@@ -38,7 +38,7 @@ func (r *Registry) Register(key target.TargetType, p plugin.Plugin) error {
 		r.plugins[key] = p
 		return nil
 	}
-	return fmt.Errorf("%w for key %v", ErrPluginExist, key)
+	return fmt.Errorf("%w for key %v", ErrPluginExists, key)
 }
 
 func (r *Registry) Get(key target.TargetType) (plugin.Plugin, error) {

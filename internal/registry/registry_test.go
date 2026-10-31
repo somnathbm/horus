@@ -31,8 +31,8 @@ func TestRegister(t *testing.T) {
 			// success
 		}
 		if err != nil {
-			if !errors.Is(err, ErrPluginExist) {
-				t.Errorf("expecting error of %v, got %v", ErrPluginExist, err)
+			if !errors.Is(err, ErrPluginExists) {
+				t.Errorf("expecting error of %v, got %v", ErrPluginExists, err)
 				return
 			}
 		}
@@ -40,13 +40,8 @@ func TestRegister(t *testing.T) {
 		// second time
 		err = reg.Register(target.TargetKubernetesJob, plugin.KubernetesJobPlugin{})
 
-		// if err == nil {
-		// 	t.Fatalf("expecting non-nil error, got nil error")
-		// }
-		if err != nil {
-			if !errors.Is(err, ErrPluginExist) {
-				t.Errorf("expecting error of %v, got %v", ErrPluginExist, err)
-			}
+		if !errors.Is(err, ErrPluginExists) {
+			t.Errorf("expecting error of %v, got %v", ErrPluginExists, err)
 		}
 	})
 
@@ -55,12 +50,21 @@ func TestRegister(t *testing.T) {
 		reg := New()
 		err := reg.Register(target.TargetKubernetesJob, nil)
 
-		if err == nil {
-			t.Fatalf("expecting non-nil error, got nil error")
-		}
 		if err != nil {
 			if !errors.Is(err, ErrInvalidPlugin) {
 				t.Errorf("expecting error of %v, got %v", ErrInvalidPlugin, err)
+			}
+		}
+	})
+
+	// missing target type
+	t.Run("missing-target-type", func(t *testing.T) {
+		reg := New()
+		err := reg.Register("", nil)
+
+		if err != nil {
+			if !errors.Is(err, ErrInvalidTargetType) {
+				t.Errorf("expecting error of %v, got %v", ErrInvalidTargetType, err)
 			}
 		}
 	})
@@ -75,15 +79,14 @@ func TestGet(t *testing.T) {
 
 		if err == nil {
 			// success
-
 		}
 		if err != nil {
 			t.Errorf("expecting nil error, but got error %v", err)
 		}
 	})
 
-	// missing key
-	t.Run("missing-key", func(t *testing.T) {
+	// unregistered target type
+	t.Run("unregistered-target-type", func(t *testing.T) {
 		reg := New()
 		_, err := reg.Get("kqueue-workload")
 
@@ -93,6 +96,18 @@ func TestGet(t *testing.T) {
 		if err != nil {
 			if !errors.Is(err, ErrPluginNotFound) {
 				t.Errorf("expecting error of %v, got %v", ErrPluginNotFound, err)
+			}
+		}
+	})
+
+	// missing target type
+	t.Run("missing-target-type", func(t *testing.T) {
+		reg := New()
+		_, err := reg.Get("")
+
+		if err != nil {
+			if !errors.Is(err, ErrInvalidTargetType) {
+				t.Errorf("expecting error of %v, got %v", ErrInvalidTargetType, err)
 			}
 		}
 	})
