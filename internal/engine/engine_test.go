@@ -20,6 +20,8 @@ var (
 type fakePlugin struct {
 	calls      int
 	calledWith target.Target
+	status     health.WorkloadStatus
+	err        error
 }
 
 func (f *fakePlugin) Check(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
@@ -35,6 +37,12 @@ func (f *fakePlugin) Check(ctx context.Context, t target.Target) (health.Workloa
 
 	f.calls++
 	f.calledWith = t
+	f.status = health.WorkloadStatus{
+		TargetID: t.ID,
+		State:    health.StateUnknown,
+		Reason:   "target inspection not implemented",
+	}
+	f.err = nil
 
 	return health.WorkloadStatus{
 		TargetID: t.ID,
@@ -65,36 +73,34 @@ func TestEngine(t *testing.T) {
 		kubeJobPluginFake := fakePlugin{}
 		kueuePluginFake := fakePlugin{}
 		reg.Register(target.TargetKubernetesJob, &kubeJobPluginFake)
-		reg.Register(target.TargetKubernetesJob, &kueuePluginFake)
+		reg.Register(target.TargetType("kueue-workload"), &kueuePluginFake)
 
 		// create an engine with the registry
 		engine := New(reg)
 
-		workloadStatus, err := engine.Evaluate(t.Context(), dummyTarget)
+		_, err := engine.Evaluate(t.Context(), dummyTarget)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 
 		// assert workloadStatus is not empty
-		if workloadStatus != (health.WorkloadStatus{}) {
-			// assert error is nil
-			if err == nil {
-				// success
-			}
+		// assert error is nil
+		if err == nil {
+			// success
+		}
 
-			// assert correct plugin was called
-			if kubeJobPluginFake.calls != 1 {
-				t.Errorf("expected kubeJobPluginFake to be called once, but it was called %d times", kubeJobPluginFake.calls)
-			}
+		// assert correct plugin was called
+		if kubeJobPluginFake.calls != 1 {
+			t.Errorf("expected kubeJobPluginFake to be called once, but it was called %d times", kubeJobPluginFake.calls)
+		}
 
-			if kueuePluginFake.calls != 0 {
-				t.Errorf("expected kueuePluginFake to not be called, but it was called %d times", kueuePluginFake.calls)
-			}
+		if kueuePluginFake.calls != 0 {
+			t.Errorf("expected kueuePluginFake to not be called, but it was called %d times", kueuePluginFake.calls)
+		}
 
-			// assert plugin was called with the correct target
-			if kubeJobPluginFake.calledWith != dummyTarget {
-				t.Errorf("expected kubeJobPluginFake to be called with %v, but it was called with %v", dummyTarget, kubeJobPluginFake.calledWith)
-			}
+		// assert plugin was called with the correct target
+		if kubeJobPluginFake.calledWith != dummyTarget {
+			t.Errorf("expected kubeJobPluginFake to be called with %v, but it was called with %v", dummyTarget, kubeJobPluginFake.calledWith)
 		}
 	})
 }
