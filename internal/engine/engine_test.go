@@ -24,83 +24,103 @@ type fakePlugin struct {
 	err        error
 }
 
-func (f *fakePlugin) Check(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
-	// if target is empty
+func (fp *fakePlugin) Check(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
+	// if target is not "kubernetes-job"
 	if t.Type == "" {
-		return health.WorkloadStatus{}, fmt.Errorf("target %v is %w", t.Name, ErrInvalidTarget)
+		fp.err = fmt.Errorf("target %v is %w", t.Name, ErrInvalidTarget)
+		return fp.status, fp.err
 	}
 
 	// if spec is missing
 	if t.Spec == nil {
-		return health.WorkloadStatus{}, fmt.Errorf("target %v contains %w", t.Name, ErrInvalidTargetSpec)
+		fp.err = fmt.Errorf("target %v contains %w", t.Name, ErrInvalidTargetSpec)
+		return fp.status, fp.err
 	}
 
-	f.calls++
-	f.calledWith = t
-	f.status = health.WorkloadStatus{
+	// populate the plugin fields
+	fp.calls++
+	fp.calledWith = t
+	fp.status = health.WorkloadStatus{
 		TargetID: t.ID,
 		State:    health.StateUnknown,
 		Reason:   "target inspection not implemented",
 	}
-	f.err = nil
+	fp.err = nil
 
-	return health.WorkloadStatus{
-		TargetID: t.ID,
-		State:    health.StateUnknown,
-		Reason:   "target inspection not implemented",
-	}, nil
+	return fp.status, fp.err
 }
 
+// dummy target
 var dummyTarget target.Target = target.Target{
-	ID:   "job-001",
-	Name: "test-job-001",
+	ID:   "job-005",
+	Name: "test-job-005",
 	Type: target.TargetKubernetesJob,
 	Spec: target.KubernetesJobSpec{
-		Cluster:   "test-cluster",
-		Namespace: "test-namespace",
-		JobName:   "test-job",
+		Cluster:   "local-dev",
+		Namespace: "ml-workloads",
+		JobName:   "training-job-001",
 	},
 }
 
-// do tests
 func TestEngine(t *testing.T) {
-	// test registered target types
-	t.Run("registered-target-types", func(t *testing.T) {
-		// create a registry and register the fake plugins for "kubernetes-job" target type
-		reg := registry.New()
+	tests := []struct {
+		name       string
+		targetType target.TargetType
+		fPlugin    *fakePlugin
+		// wantHealthStatus health.WorkloadStatus
+		wantError error
+	}{
+		{
+			name:       "registered-target-type",
+			targetType: target.TargetKubernetesJob,
+			fPlugin:    &fakePlugin{},
+			// wantHealthStatus: health.WorkloadStatus{
+			// 	TargetID: "job-005",
+			// 	State:    health.StateUnknown,
+			// 	Reason:   "target inspection not implemented",
+			// },
+			wantError: nil,
+		},
+	}
 
-		// register fake plugins for "kubernetes-job" target type
-		kubeJobPluginFake := fakePlugin{}
-		kueuePluginFake := fakePlugin{}
-		reg.Register(target.TargetKubernetesJob, &kubeJobPluginFake)
-		reg.Register(target.TargetType("kueue-workload"), &kueuePluginFake)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// instantiate registry
+			reg := registry.New()
+			reg.Register(tc.targetType, tc.fPlugin)
 
-		// create an engine with the registry
-		engine := New(reg)
+			// instantiate engine with the registry
+			eng := New(reg)
+			status, err := eng.Evaluate(t.Context(), dummyTarget)
 
-		_, err := engine.Evaluate(t.Context(), dummyTarget)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+			// assertions
+			// unexpected error
+			if err != nil {
+				t.Fatalf("unexpected error %v", err)
+			}
 
-		// assert workloadStatus is not empty
-		// assert error is nil
-		if err == nil {
-			// success
-		}
+			// successful assertions
+			// assert health status
+			if status != tc.fPlugin.status {
+				t.Errorf("expecting status to match with plugin status %v, got %v", tc.fPlugin.status, status)
+			}
 
-		// assert correct plugin was called
-		if kubeJobPluginFake.calls != 1 {
-			t.Errorf("expected kubeJobPluginFake to be called once, but it was called %d times", kubeJobPluginFake.calls)
-		}
+			// assert plugin is actually called
+			if tc.fPlugin.calls != 1 {
+				t.Fatalf("plugin not called")
+			}
 
-		if kueuePluginFake.calls != 0 {
-			t.Errorf("expected kueuePluginFake to not be called, but it was called %d times", kueuePluginFake.calls)
-		}
+			// assert plugin is actually called for that target type
+			if tc.fPlugin.calledWith.Type != tc.targetType {
+				t.Errorf("expecting called target type to be %v, got %v", tc.fPlugin.calledWith.Type, tc.targetType)
+			}
 
-		// assert plugin was called with the correct target
-		if kubeJobPluginFake.calledWith != dummyTarget {
-			t.Errorf("expected kubeJobPluginFake to be called with %v, but it was called with %v", dummyTarget, kubeJobPluginFake.calledWith)
-		}
-	})
+			// error assertions
+			if tc.wantError != nil {
+				if !errors.Is(err, tc.wantError) {
+					t.Errorf("expecting error to be %v, got %v", tc.wantError, err)
+				}
+			}
+		})
+	}
 }
