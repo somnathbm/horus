@@ -92,7 +92,7 @@ func TestEngine(t *testing.T) {
 			target: target.Target{
 				ID:   "job-005",
 				Name: "test-job-005",
-				Type: target.TargetKubernetesJob,
+				Type: otherTargetType,
 				Spec: target.KubernetesJobSpec{
 					Cluster:   "local-dev",
 					Namespace: "ml-workloads",
@@ -100,13 +100,15 @@ func TestEngine(t *testing.T) {
 				},
 			},
 			fPluginMap: map[target.TargetType]*fakePlugin{
-				target.TargetKubernetesJob: {},
+				otherTargetType: {
+					err: plugin.ErrInvalidTarget,
+				},
 			},
 			wantError: plugin.ErrInvalidTarget,
 			wantCalls: map[target.TargetType]int{
-				target.TargetKubernetesJob: 0,
+				otherTargetType: 1,
 			},
-			wantPlugin: "",
+			wantPlugin: otherTargetType,
 		},
 	}
 
@@ -140,8 +142,13 @@ func TestEngine(t *testing.T) {
 			}
 			// 2.2 error path
 			if tc.wantError != nil {
+				// assert Evaluate error is what we are expecting
 				if !errors.Is(err, tc.wantError) {
 					t.Fatalf("expecting error to be %v, got %v", tc.wantError, err)
+				}
+				// assert Evaluate error is same as plugin returned error
+				if tc.fPluginMap[tc.wantPlugin] != nil && !errors.Is(err, tc.fPluginMap[tc.wantPlugin].err) {
+					t.Fatalf("expecting plugin error %v to match with evaluate, got %v", tc.wantError, tc.fPluginMap[tc.wantPlugin].err)
 				}
 			} else {
 				// 2.3 success path
