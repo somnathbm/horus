@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/somnathbm/horus/internal/health"
@@ -25,28 +24,8 @@ type fakePlugin struct {
 }
 
 func (fp *fakePlugin) Check(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
-	// if target is not "kubernetes-job"
-	if t.Type == "" {
-		fp.err = fmt.Errorf("target %v is %w", t.Name, ErrInvalidTarget)
-		return fp.status, fp.err
-	}
-
-	// if spec is missing
-	if t.Spec == nil {
-		fp.err = fmt.Errorf("target %v contains %w", t.Name, ErrInvalidTargetSpec)
-		return fp.status, fp.err
-	}
-
-	// populate the plugin fields
 	fp.calls++
 	fp.calledWith = t
-	fp.status = health.WorkloadStatus{
-		TargetID: t.ID,
-		State:    health.StateUnknown,
-		Reason:   "target inspection not implemented",
-	}
-	fp.err = nil
-
 	return fp.status, fp.err
 }
 
@@ -63,63 +42,85 @@ var dummyTarget target.Target = target.Target{
 }
 
 func TestEngine(t *testing.T) {
+	otherTargetType := target.TargetType("kueue-workload")
+
 	tests := []struct {
-		name       string
-		targetType target.TargetType
-		fPlugin    *fakePlugin
-		// wantHealthStatus health.WorkloadStatus
-		wantError error
+		name        string
+		targetTypes []target.TargetType
+		fPluginMap  map[target.TargetType]*fakePlugin
+		wantError   error
 	}{
 		{
-			name:       "registered-target-type",
-			targetType: target.TargetKubernetesJob,
-			fPlugin:    &fakePlugin{},
-			// wantHealthStatus: health.WorkloadStatus{
-			// 	TargetID: "job-005",
-			// 	State:    health.StateUnknown,
-			// 	Reason:   "target inspection not implemented",
-			// },
+			name:        "multiple-target-types",
+			targetTypes: []target.TargetType{target.TargetKubernetesJob, otherTargetType},
+			fPluginMap: map[target.TargetType]*fakePlugin{
+				target.TargetKubernetesJob: {
+					status: health.WorkloadStatus{
+						TargetID: "job-005",
+						State:    health.StateUnknown,
+						Reason:   "target inspection not implemented",
+					},
+				},
+				otherTargetType: {
+					status: health.WorkloadStatus{
+						TargetID: "workload-001",
+						State:    health.StateUnknown,
+						Reason:   "target inspection not implemented",
+					},
+				},
+			},
 			wantError: nil,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// instantiate registry
+			// 1. instantiate registry
 			reg := registry.New()
-			reg.Register(tc.targetType, tc.fPlugin)
+			for _, targetType := range tc.targetTypes {
+				// register the fake plugin for each target type
+				err := reg.Register(targetType, tc.fPluginMap[targetType])
+				if err != nil {
+					t.Fatalf("failed to register target type: \"%v\" with error: %v", targetType, err)
+				}
+			}
 
-			// instantiate engine with the registry
+			// 2. instantiate engine with the registry
 			eng := New(reg)
 			status, err := eng.Evaluate(t.Context(), dummyTarget)
 
-			// assertions
-			// unexpected error
-			if err != nil {
-				t.Fatalf("unexpected error %v", err)
-			}
-
-			// successful assertions
-			// assert health status
-			if status != tc.fPlugin.status {
-				t.Errorf("expecting status to match with plugin status %v, got %v", tc.fPlugin.status, status)
-			}
-
-			// assert plugin is actually called
-			if tc.fPlugin.calls != 1 {
-				t.Fatalf("plugin not called")
-			}
-
-			// assert plugin is actually called for that target type
-			if tc.fPlugin.calledWith.Type != tc.targetType {
-				t.Errorf("expecting called target type to be %v, got %v", tc.fPlugin.calledWith.Type, tc.targetType)
-			}
-
+			// 3. ======== assertions ========
 			// error assertions
 			if tc.wantError != nil {
 				if !errors.Is(err, tc.wantError) {
 					t.Errorf("expecting error to be %v, got %v", tc.wantError, err)
 				}
+			}
+
+			// assert Evaluate and plugin error matches
+			if err != tc.fPluginMap[dummyTarget.Type].err {
+				t.Errorf("expecting error to be %v, got %v", tc.fPluginMap[dummyTarget.Type].err, err)
+			}
+
+			// successful assertions
+			// assert health status
+			if status != tc.fPluginMap[dummyTarget.Type].status {
+				t.Errorf("expecting status to match with plugin status %v, got %v", tc.fPluginMap[dummyTarget.Type].status, status)
+			}
+
+			// assert CORRECT plugin is actually called
+			if tc.fPluginMap[dummyTarget.Type].calls != 1 {
+				t.Fatalf("plugin not called")
+			}
+
+			// assert other plugin is NOT called
+			if tc.fPluginMap[otherTargetType].calls != 0 {
+				t.Fatalf("other plugin should not be called")
+			}
+
+			// assert plugin is called with the correct target
+			if tc.fPluginMap[dummyTarget.Type].calledWith != dummyTarget {
+				t.Errorf("expecting plugin to be called with target %v, got %v", dummyTarget, tc.fPluginMap[dummyTarget.Type].calledWith)
 			}
 		})
 	}
