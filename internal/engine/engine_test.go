@@ -29,13 +29,12 @@ func TestEngine(t *testing.T) {
 	otherTargetType := target.TargetType("other-target-type")
 
 	tests := []struct {
-		name        string
-		target      target.Target
-		targetTypes []target.TargetType
-		fPluginMap  map[target.TargetType]*fakePlugin
-		wantError   error
-		wantCalls   map[target.TargetType]int
-		wantPlugin  target.TargetType
+		name       string
+		target     target.Target
+		fPluginMap map[target.TargetType]*fakePlugin
+		wantError  error
+		wantCalls  map[target.TargetType]int
+		wantPlugin target.TargetType
 	}{
 		{
 			name: "multiple-target-types",
@@ -49,7 +48,6 @@ func TestEngine(t *testing.T) {
 					JobName:   "training-job-001",
 				},
 			},
-			targetTypes: []target.TargetType{target.TargetKubernetesJob, otherTargetType},
 			fPluginMap: map[target.TargetType]*fakePlugin{
 				target.TargetKubernetesJob: {
 					status: health.WorkloadStatus{
@@ -79,7 +77,6 @@ func TestEngine(t *testing.T) {
 					JobName:   "training-job-001",
 				},
 			},
-			targetTypes: []target.TargetType{otherTargetType},
 			fPluginMap: map[target.TargetType]*fakePlugin{
 				otherTargetType: {},
 			},
@@ -93,36 +90,39 @@ func TestEngine(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// 1. instantiate registry
+			// 1. ====== setup ======
+			// 1.1 instantiate registry
 			reg := registry.New()
-			for _, targetType := range tc.targetTypes {
+			for targetType, fakePlgn := range tc.fPluginMap {
 				// register the fake plugin for each target type
-				err := reg.Register(targetType, tc.fPluginMap[targetType])
+				err := reg.Register(targetType, fakePlgn)
 				if err != nil {
 					t.Fatalf("failed to register target type: \"%v\" with error: %v", targetType, err)
 				}
 			}
 
-			// 2. instantiate engine with the registry
+			// 1.2 instantiate engine with the registry
 			eng := New(reg)
 			status, err := eng.Evaluate(t.Context(), tc.target)
 
-			// 3. ======== assertions ========
-			// error path
+			// 2. ======== assertions ========
+			// 2.1 common path
+			// this means, the plugin was called i.e. plugin.Check() was invoked, so we can assert the number of calls for each plugin
+			for k, v := range tc.fPluginMap {
+				if v.calls != tc.wantCalls[k] {
+					t.Fatalf("plugin for target type %v should be called %d times, got %d", k, tc.wantCalls[k], v.calls)
+				}
+			}
+			// 2.2 error path
 			if tc.wantError != nil {
 				if !errors.Is(err, tc.wantError) {
 					t.Fatalf("expecting error to be %v, got %v", tc.wantError, err)
 				}
 			} else {
+				// 2.3 success path
 				// assert error is nil when no error is expected
 				if err != nil {
 					t.Fatalf("expecting no error, got %v", err)
-				}
-				// this means, the plugin was called i.e. plugin.Check() was invoked, so we can assert the number of calls for each plugin
-				for k, v := range tc.fPluginMap {
-					if v.calls != tc.wantCalls[k] {
-						t.Fatalf("plugin for target type %v should be called %d times, got %d", k, tc.wantCalls[k], v.calls)
-					}
 				}
 
 				// assert health status
@@ -134,11 +134,6 @@ func TestEngine(t *testing.T) {
 				if !reflect.DeepEqual(tc.fPluginMap[tc.wantPlugin].calledWith, tc.target) {
 					t.Errorf("expecting plugin to be called with target %v, got %v", tc.target, tc.fPluginMap[tc.wantPlugin].calledWith)
 				}
-
-				// assert Evaluate and plugin error matches
-				// if !errors.Is(err, tc.fPluginMap[tc.wantPlugin].err) {
-				// 	t.Errorf("expecting error to be %v, got %v", tc.fPluginMap[tc.wantPlugin].err, err)
-				// }
 			}
 		})
 	}
