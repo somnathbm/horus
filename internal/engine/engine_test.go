@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/somnathbm/horus/internal/health"
-	"github.com/somnathbm/horus/internal/plugin"
 	"github.com/somnathbm/horus/internal/registry"
 	"github.com/somnathbm/horus/internal/target"
 )
@@ -25,6 +24,8 @@ func (fp *fakePlugin) Check(ctx context.Context, t target.Target) (health.Worklo
 	fp.calledWith = t
 	return fp.status, fp.err
 }
+
+var errFakePlugin = errors.New("fake plugin error")
 
 func TestEngine(t *testing.T) {
 	otherTargetType := target.TargetType("other-target-type")
@@ -92,7 +93,7 @@ func TestEngine(t *testing.T) {
 			target: target.Target{
 				ID:   "job-005",
 				Name: "test-job-005",
-				Type: otherTargetType,
+				Type: target.TargetKubernetesJob,
 				Spec: target.KubernetesJobSpec{
 					Cluster:   "local-dev",
 					Namespace: "ml-workloads",
@@ -100,15 +101,15 @@ func TestEngine(t *testing.T) {
 				},
 			},
 			fPluginMap: map[target.TargetType]*fakePlugin{
-				otherTargetType: {
-					err: plugin.ErrInvalidTarget,
+				target.TargetKubernetesJob: {
+					err: errFakePlugin,
 				},
 			},
-			wantError: plugin.ErrInvalidTarget,
+			wantError: errFakePlugin,
 			wantCalls: map[target.TargetType]int{
-				otherTargetType: 1,
+				target.TargetKubernetesJob: 1,
 			},
-			wantPlugin: otherTargetType,
+			wantPlugin: target.TargetKubernetesJob,
 		},
 	}
 
@@ -140,15 +141,15 @@ func TestEngine(t *testing.T) {
 					t.Fatalf("plugin for target type %v should be called %d times, got %d", k, tc.wantCalls[k], v.calls)
 				}
 			}
+			// assert plugin is called with the correct target
+			if tc.fPluginMap[tc.wantPlugin] != nil && !reflect.DeepEqual(tc.fPluginMap[tc.wantPlugin].calledWith, tc.target) {
+				t.Errorf("expecting plugin to be called with target %v, got %v", tc.target, tc.fPluginMap[tc.wantPlugin].calledWith)
+			}
 			// 2.2 error path
 			if tc.wantError != nil {
 				// assert Evaluate error is what we are expecting
 				if !errors.Is(err, tc.wantError) {
 					t.Fatalf("expecting error to be %v, got %v", tc.wantError, err)
-				}
-				// assert Evaluate error is same as plugin returned error
-				if tc.fPluginMap[tc.wantPlugin] != nil && !errors.Is(err, tc.fPluginMap[tc.wantPlugin].err) {
-					t.Fatalf("expecting plugin error %v to match with evaluate, got %v", tc.wantError, tc.fPluginMap[tc.wantPlugin].err)
 				}
 			} else {
 				// 2.3 success path
@@ -162,10 +163,10 @@ func TestEngine(t *testing.T) {
 					t.Errorf("expecting status to match with plugin status %v, got %v", tc.fPluginMap[tc.wantPlugin].status, status)
 				}
 
-				// assert plugin is called with the correct target
-				if !reflect.DeepEqual(tc.fPluginMap[tc.wantPlugin].calledWith, tc.target) {
-					t.Errorf("expecting plugin to be called with target %v, got %v", tc.target, tc.fPluginMap[tc.wantPlugin].calledWith)
-				}
+				// // assert plugin is called with the correct target
+				// if !reflect.DeepEqual(tc.fPluginMap[tc.wantPlugin].calledWith, tc.target) {
+				// 	t.Errorf("expecting plugin to be called with target %v, got %v", tc.target, tc.fPluginMap[tc.wantPlugin].calledWith)
+				// }
 			}
 		})
 	}
