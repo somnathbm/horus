@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/somnathbm/horus/internal/health"
+	"github.com/somnathbm/horus/internal/plugin"
 	"github.com/somnathbm/horus/internal/registry"
 	"github.com/somnathbm/horus/internal/target"
 )
@@ -86,6 +87,27 @@ func TestEngine(t *testing.T) {
 			},
 			wantPlugin: "",
 		},
+		{
+			name: "plugin-with-error",
+			target: target.Target{
+				ID:   "job-005",
+				Name: "test-job-005",
+				Type: target.TargetKubernetesJob,
+				Spec: target.KubernetesJobSpec{
+					Cluster:   "local-dev",
+					Namespace: "ml-workloads",
+					JobName:   "training-job-001",
+				},
+			},
+			fPluginMap: map[target.TargetType]*fakePlugin{
+				target.TargetKubernetesJob: {},
+			},
+			wantError: plugin.ErrInvalidTarget,
+			wantCalls: map[target.TargetType]int{
+				target.TargetKubernetesJob: 0,
+			},
+			wantPlugin: "",
+		},
 	}
 
 	for _, tc := range tests {
@@ -107,8 +129,11 @@ func TestEngine(t *testing.T) {
 
 			// 2. ======== assertions ========
 			// 2.1 common path
-			// this means, the plugin was called i.e. plugin.Check() was invoked, so we can assert the number of calls for each plugin
+			// assert expected calls count for each registered plugin
 			for k, v := range tc.fPluginMap {
+				if _, ok := tc.wantCalls[k]; !ok {
+					t.Fatalf("unexpected target type %v in wantCalls", k)
+				}
 				if v.calls != tc.wantCalls[k] {
 					t.Fatalf("plugin for target type %v should be called %d times, got %d", k, tc.wantCalls[k], v.calls)
 				}
