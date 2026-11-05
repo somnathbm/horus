@@ -3,16 +3,12 @@ package engine
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/somnathbm/horus/internal/health"
 	"github.com/somnathbm/horus/internal/registry"
 	"github.com/somnathbm/horus/internal/target"
-)
-
-var (
-	ErrInvalidTarget     = errors.New("invalid target")
-	ErrInvalidTargetSpec = errors.New("invalid target spec")
 )
 
 // fake plugin that implements the target.Plugin interface for testing purposes
@@ -42,13 +38,14 @@ var dummyTarget target.Target = target.Target{
 }
 
 func TestEngine(t *testing.T) {
-	otherTargetType := target.TargetType("kueue-workload")
+	otherTargetType := target.TargetType("other-target-type")
 
 	tests := []struct {
 		name        string
 		targetTypes []target.TargetType
 		fPluginMap  map[target.TargetType]*fakePlugin
 		wantError   error
+		wantCalls   map[target.TargetType]int
 	}{
 		{
 			name:        "multiple-target-types",
@@ -70,6 +67,25 @@ func TestEngine(t *testing.T) {
 				},
 			},
 			wantError: nil,
+			wantCalls: map[target.TargetType]int{
+				target.TargetKubernetesJob: 1,
+				otherTargetType:            0,
+			},
+		},
+		{
+			name: "unregistered-target-type",
+			targetTypes: []target.TargetType{
+				otherTargetType,
+			},
+			fPluginMap: map[target.TargetType]*fakePlugin{
+				otherTargetType: {
+					err: registry.ErrPluginNotFound,
+				},
+			},
+			wantError: registry.ErrPluginNotFound,
+			wantCalls: map[target.TargetType]int{
+				otherTargetType: 0,
+			},
 		},
 	}
 
@@ -90,37 +106,45 @@ func TestEngine(t *testing.T) {
 			status, err := eng.Evaluate(t.Context(), dummyTarget)
 
 			// 3. ======== assertions ========
-			// error assertions
+			// error path
 			if tc.wantError != nil {
 				if !errors.Is(err, tc.wantError) {
-					t.Errorf("expecting error to be %v, got %v", tc.wantError, err)
+					t.Fatalf("expecting error to be %v, got %v", tc.wantError, err)
+					return
 				}
 			}
 
-			// assert Evaluate and plugin error matches
-			if err != tc.fPluginMap[dummyTarget.Type].err {
-				t.Errorf("expecting error to be %v, got %v", tc.fPluginMap[dummyTarget.Type].err, err)
+			// common path: assert plugin call counts
+			for k, v := range tc.fPluginMap {
+				if v.calls != tc.wantCalls[k] {
+					t.Fatalf("plugin for target type %v should be called %d times, got %d", k, tc.wantCalls[k], v.calls)
+					return
+				}
 			}
 
-			// successful assertions
-			// assert health status
-			if status != tc.fPluginMap[dummyTarget.Type].status {
-				t.Errorf("expecting status to match with plugin status %v, got %v", tc.fPluginMap[dummyTarget.Type].status, status)
-			}
+			// happy path: assert plugin status and called target
+			if tc.wantError == nil && err == nil {
+				var calledPluginKey target.TargetType
+				for k, v := range tc.wantCalls {
+					if v == 1 {
+						calledPluginKey = k
+					}
+				}
 
-			// assert CORRECT plugin is actually called
-			if tc.fPluginMap[dummyTarget.Type].calls != 1 {
-				t.Fatalf("plugin not called")
-			}
+				// assert health status
+				if !reflect.DeepEqual(status, tc.fPluginMap[calledPluginKey].status) {
+					t.Errorf("expecting status to match with plugin status %v, got %v", tc.fPluginMap[calledPluginKey].status, status)
+				}
 
-			// assert other plugin is NOT called
-			if tc.fPluginMap[otherTargetType].calls != 0 {
-				t.Fatalf("other plugin should not be called")
-			}
+				// assert plugin is called with the correct target
+				if !reflect.DeepEqual(tc.fPluginMap[calledPluginKey].calledWith, dummyTarget) {
+					t.Errorf("expecting plugin to be called with target %v, got %v", dummyTarget, tc.fPluginMap[calledPluginKey].calledWith)
+				}
 
-			// assert plugin is called with the correct target
-			if tc.fPluginMap[dummyTarget.Type].calledWith != dummyTarget {
-				t.Errorf("expecting plugin to be called with target %v, got %v", dummyTarget, tc.fPluginMap[dummyTarget.Type].calledWith)
+				// assert Evaluate and plugin error matches
+				if !errors.Is(err, tc.fPluginMap[calledPluginKey].err) {
+					t.Errorf("expecting error to be %v, got %v", tc.fPluginMap[calledPluginKey].err, err)
+				}
 			}
 		})
 	}
