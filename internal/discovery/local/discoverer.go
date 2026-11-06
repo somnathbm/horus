@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -74,7 +75,15 @@ func (ld *LocalDiscoverer) Discover(ctx context.Context) (discovery.DiscoveryRes
 		}
 
 		// 2. Read directory
-		entries, readDirErr := os.ReadDir(ld.path)
+		// Get the directory where the binary is executing
+		cwd, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Join it safely to your target folder
+		targetDir := filepath.Join(cwd, ld.path)
+		entries, readDirErr := os.ReadDir(targetDir)
 		if readDirErr != nil {
 			return discovery.DiscoveryResult{}, fmt.Errorf("%q: %w", ld.path, readDirErr)
 		}
@@ -118,7 +127,7 @@ func (ld *LocalDiscoverer) Discover(ctx context.Context) (discovery.DiscoveryRes
 				}
 
 				// 3.2 read the file
-				fileEntryPath := filepath.Join(ld.path, fileName)
+				fileEntryPath := filepath.Join(targetDir, fileName)
 				content, readFileErr := os.ReadFile(fileEntryPath)
 				if readFileErr != nil {
 					newFailure := discovery.DiscoveryFailure{

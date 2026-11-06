@@ -10,6 +10,10 @@ import (
 	"github.com/somnathbm/horus/internal/config"
 	"github.com/somnathbm/horus/internal/discovery"
 	"github.com/somnathbm/horus/internal/discovery/local"
+	"github.com/somnathbm/horus/internal/engine"
+	"github.com/somnathbm/horus/internal/plugin"
+	"github.com/somnathbm/horus/internal/registry"
+	"github.com/somnathbm/horus/internal/target"
 )
 
 func main() {
@@ -40,11 +44,26 @@ func main() {
 
 	// 4. instantiate manager
 	dscvryManager := discovery.New(discoverers...)
-	dscvryResult, dscvryErr := dscvryManager.Discover(ctx)
+	dscvryRslt, dscvryErr := dscvryManager.Discover(ctx)
 	if dscvryErr != nil {
 		fmt.Printf("discovery: %v", dscvryErr)
 	}
-	fmt.Println("@@@@@")
-	fmt.Println(dscvryResult)
+
+	// 5. instantiate engine with the registry
+	reg := registry.New()
+	reg.Register(target.TargetKubernetesJob, plugin.KubernetesJobPlugin{})
+	// TODO: register other plugins if any
+
+	// 6. instantiate engine and evaluate discovered targets
+	eng := engine.New(reg)
+	// iterate over discovered targets and evaluate them
+	for _, t := range dscvryRslt.Targets {
+		status, err := eng.Evaluate(ctx, t)
+		if err != nil {
+			fmt.Printf("target %v: %v\n", t.Name, err)
+		} else {
+			fmt.Printf("target %v: %v\n", t.Name, status)
+		}
+	}
 
 }
