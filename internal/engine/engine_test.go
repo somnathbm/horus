@@ -177,7 +177,7 @@ func TestEngine(t *testing.T) {
 		}
 		eng := New(reg)
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel() // cancel the context immediately
 
 		target := target.Target{
