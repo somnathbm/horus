@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -37,7 +36,7 @@ func validateConfig(appConfig AppConfig) (AppConfig, error) {
 		if sources.Local[i].Name == "" {
 			return AppConfig{}, fmt.Errorf("discovery.local[%v]: %w", i, ErrNoSourceName)
 		}
-		if sources.Local[i].Path == "" || !filepath.IsAbs(sources.Local[i].Path) {
+		if sources.Local[i].Path == "" {
 			return AppConfig{}, fmt.Errorf("discovery.local[%v]: %w", i, ErrInvalidFilePath)
 		}
 	}

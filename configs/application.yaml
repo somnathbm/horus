@@ -1,7 +1,7 @@
 discovery:
   local:
     - name: "      local-dev "
-      path: /examples/targets
+      path: examples/targets
 
   # kubernetes:
   #   - name: dev-cluster

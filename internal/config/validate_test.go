@@ -23,22 +23,22 @@ func TestValidateConfigs(t *testing.T) {
 			AppConfig{
 				Discovery: DiscoveryConfig{
 					Local: []LocalSourceConfig{
-						{Name: "", Path: "/data"},
+						{Name: "", Path: "examples/targets"},
 					},
 				},
 			},
 			ErrNoSourceName,
 		},
 		{
-			"local-config-no-abs-path",
+			"local-config-abs-path",
 			AppConfig{
 				Discovery: DiscoveryConfig{
 					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "data/resources/"},
+						{Name: "dev-local", Path: "/examples/targets"},
 					},
 				},
 			},
-			ErrInvalidFilePath,
+			nil,
 		},
 		{
 			"local-config-empty-path",
@@ -56,7 +56,7 @@ func TestValidateConfigs(t *testing.T) {
 			AppConfig{
 				Discovery: DiscoveryConfig{
 					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "/data"},
+						{Name: "dev-local", Path: "examples/targets"},
 					},
 				},
 			},
@@ -166,7 +166,7 @@ func TestValidateConfigs(t *testing.T) {
 			AppConfig{
 				Discovery: DiscoveryConfig{
 					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "/data"},
+						{Name: "dev-local", Path: "examples/targets"},
 					},
 					AWS: []AWSSourceConfig{
 						{Name: "", AccountID: "12ac67893bg4"},
@@ -176,16 +176,16 @@ func TestValidateConfigs(t *testing.T) {
 			ErrNoSourceName,
 		},
 		{
-			"valid-invalid-local-config",
+			"valid-local-config-relative-abs-path",
 			AppConfig{
 				Discovery: DiscoveryConfig{
 					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "/data"},
-						{Name: "dev-staging", Path: "data/resources/"},
+						{Name: "dev-local", Path: "/examples/targets"},
+						{Name: "dev-staging", Path: "examples/staging"},
 					},
 				},
 			},
-			ErrInvalidFilePath,
+			nil,
 		},
 		{
 			"empty-local-config",
