@@ -49,9 +49,17 @@ func main() {
 		fmt.Printf("discovery: %v", dscvryErr)
 	}
 
+	// iterate through discovery failures if any, and report them
+	for _, failure := range dscvryRslt.Failures {
+		fmt.Printf("discovery failure item: %q, error: %v\n", failure.Item, failure.Err)
+	}
+
 	// 5. instantiate engine with the registry
 	reg := registry.New()
-	reg.Register(target.TargetKubernetesJob, plugin.KubernetesJobPlugin{})
+	registerErr := reg.Register(target.TargetKubernetesJob, plugin.KubernetesJobPlugin{})
+	if registerErr != nil {
+		log.Fatalf("register: %v", registerErr)
+	}
 	// TODO: register other plugins if any
 
 	// 6. instantiate engine and evaluate discovered targets
@@ -62,7 +70,7 @@ func main() {
 		if err != nil {
 			fmt.Printf("target %v: %v\n", t.Name, err)
 		} else {
-			fmt.Printf("target %v: %v\n", t.Name, status)
+			fmt.Printf("target: %q\nstatus: %v\nreason: %v\n", t.Name, status.State, status.Reason)
 		}
 	}
 
