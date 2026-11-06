@@ -162,12 +162,46 @@ func TestEngine(t *testing.T) {
 				if !reflect.DeepEqual(status, tc.fPluginMap[tc.wantPlugin].status) {
 					t.Errorf("expecting status to match with plugin status %v, got %v", tc.fPluginMap[tc.wantPlugin].status, status)
 				}
-
-				// // assert plugin is called with the correct target
-				// if !reflect.DeepEqual(tc.fPluginMap[tc.wantPlugin].calledWith, tc.target) {
-				// 	t.Errorf("expecting plugin to be called with target %v, got %v", tc.target, tc.fPluginMap[tc.wantPlugin].calledWith)
-				// }
 			}
 		})
 	}
+
+	// cancelled context test
+	t.Run("cancelled-context", func(t *testing.T) {
+		// 1. setup
+		reg := registry.New()
+		fakePlgn := &fakePlugin{}
+		err := reg.Register(target.TargetKubernetesJob, fakePlgn)
+		if err != nil {
+			t.Fatalf("failed to register target type: \"%v\" with error: %v", target.TargetKubernetesJob, err)
+		}
+		eng := New(reg)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // cancel the context immediately
+
+		target := target.Target{
+			ID:   "job-005",
+			Name: "test-job-005",
+			Type: target.TargetKubernetesJob,
+			Spec: target.KubernetesJobSpec{
+				Cluster:   "local-dev",
+				Namespace: "ml-workloads",
+				JobName:   "training-job-001",
+			},
+		}
+
+		status, err := eng.Evaluate(ctx, target)
+
+		// 2. assertions
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expecting error to be %v, got %v", context.Canceled, err)
+		}
+		if status != (health.WorkloadStatus{}) {
+			t.Errorf("expecting status to be empty, got %v", status)
+		}
+		if fakePlgn.calls != 0 {
+			t.Errorf("expecting plugin to not be called, got %d calls", fakePlgn.calls)
+		}
+	})
 }
