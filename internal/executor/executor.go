@@ -18,9 +18,9 @@ var (
 
 // evaluation result envelope
 type Result struct {
-	targetID string
-	status   health.WorkloadStatus
-	err      error
+	TargetID string
+	Status   health.WorkloadStatus
+	Err      error
 }
 
 // an evaluator interface that will actually evaluate a target
@@ -41,7 +41,7 @@ func New(wc int, qc int, ev Evaluator) (*Executor, error) {
 	if wc <= 0 {
 		return nil, fmt.Errorf("config error: %w", errNoWorkers)
 	}
-	if qc <= 0 {
+	if qc < 0 {
 		return nil, fmt.Errorf("config error: %w", errInsufficientQueueCapacity)
 	}
 	if ev == nil {
@@ -55,15 +55,6 @@ func New(wc int, qc int, ev Evaluator) (*Executor, error) {
 	}, nil
 }
 
-// process target within each worker
-func processTarget(ctx context.Context, eval Evaluator, t target.Target) (health.WorkloadStatus, error) {
-	if err := ctx.Err(); err != nil {
-		return health.WorkloadStatus{}, err
-	}
-
-	return eval.Evaluate(ctx, t)
-}
-
 // worker function
 func worker(ctx context.Context, eval Evaluator, targetQueue <-chan target.Target, resultCh chan<- Result) {
 	for {
@@ -74,42 +65,45 @@ func worker(ctx context.Context, eval Evaluator, targetQueue <-chan target.Targe
 			if !ok {
 				return
 			}
-			status, err := processTarget(ctx, eval, target)
-			if err != nil {
-				resultCh <- Result{
-					targetID: target.ID,
-					status:   health.WorkloadStatus{},
-					err:      err,
-				}
-			}
+			status, err := eval.Evaluate(ctx, target)
 
-			// send result
-			resultCh <- Result{
-				targetID: target.ID,
-				status:   status,
-				err:      nil,
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				// send result
+				resultCh <- Result{
+					TargetID: target.ID,
+					Status:   status,
+					Err:      err,
+				}
 			}
 		}
 	}
 }
 
 // workerpool orchestrator
-func (ex *Executor) Run(ctx context.Context, targets []target.Target) (chan<- Result, error) {
+func (ex *Executor) Run(ctx context.Context, targets []target.Target) <-chan Result {
 	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("context: %w", err)
+		return nil
 	}
 
 	// instatiate channels
 	targetQueue := make(chan target.Target, ex.queueCapacity)
-	resultCh := make(chan<- Result)
+	resultCh := make(chan Result)
 	var wg sync.WaitGroup
 
 	// producer
 	producerFunc := func() {
 		go func() {
 			defer close(targetQueue)
-			for i := 1; i <= len(targets); i++ {
-				targetQueue <- targets[i]
+			for i := 0; i <= len(targets)-1; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					targetQueue <- targets[i]
+				}
 			}
 		}()
 	}
@@ -136,5 +130,5 @@ func (ex *Executor) Run(ctx context.Context, targets []target.Target) (chan<- Re
 	coordinatorFunc()
 
 	// process
-	return resultCh, nil
+	return resultCh
 }
