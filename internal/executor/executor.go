@@ -73,6 +73,7 @@ func worker(ctx context.Context, eval Evaluator, targetQueue <-chan target.Targe
 				Err:      err,
 			}
 
+			// protects results from forever blocking
 			select {
 			case <-ctx.Done():
 				return
@@ -84,14 +85,18 @@ func worker(ctx context.Context, eval Evaluator, targetQueue <-chan target.Targe
 
 // workerpool orchestrator
 func (ex *Executor) Run(ctx context.Context, targets []target.Target) <-chan Result {
-	// instatiate channels
-	targetQueue := make(chan target.Target, ex.queueCapacity)
+	// result channel
 	resultCh := make(chan Result)
-	var wg sync.WaitGroup
 
+	// if context is cancelled even before workers are called
 	if err := ctx.Err(); err != nil {
+		close(resultCh)
 		return resultCh
 	}
+
+	// queue and worker group
+	targetQueue := make(chan target.Target, ex.queueCapacity)
+	var wg sync.WaitGroup
 
 	// producer
 	go func() {
