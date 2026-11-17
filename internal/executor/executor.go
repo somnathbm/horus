@@ -66,17 +66,17 @@ func worker(ctx context.Context, eval Evaluator, targetQueue <-chan target.Targe
 				return
 			}
 			status, err := eval.Evaluate(ctx, target)
+			// construct result
+			result := Result{
+				TargetID: target.ID,
+				Status:   status,
+				Err:      err,
+			}
 
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				// send result
-				resultCh <- Result{
-					TargetID: target.ID,
-					Status:   status,
-					Err:      err,
-				}
+			case resultCh <- result:
 			}
 		}
 	}
@@ -84,50 +84,40 @@ func worker(ctx context.Context, eval Evaluator, targetQueue <-chan target.Targe
 
 // workerpool orchestrator
 func (ex *Executor) Run(ctx context.Context, targets []target.Target) <-chan Result {
-	if err := ctx.Err(); err != nil {
-		return nil
-	}
-
 	// instatiate channels
 	targetQueue := make(chan target.Target, ex.queueCapacity)
 	resultCh := make(chan Result)
 	var wg sync.WaitGroup
 
-	// producer
-	producerFunc := func() {
-		go func() {
-			defer close(targetQueue)
-			for i := 0; i <= len(targets)-1; i++ {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					targetQueue <- targets[i]
-				}
-			}
-		}()
+	if err := ctx.Err(); err != nil {
+		return resultCh
 	}
-	producerFunc()
+
+	// producer
+	go func() {
+		defer close(targetQueue)
+		for _, target := range targets {
+			select {
+			case <-ctx.Done():
+				return
+			case targetQueue <- target:
+			}
+		}
+	}()
 
 	// consumer
-	consumerFunc := func() {
-		for i := 1; i <= ex.workerCount; i++ {
-			// spin off worker
-			wg.Go(func() {
-				worker(ctx, ex.evaluator, targetQueue, resultCh)
-			})
-		}
+	for i := 1; i <= ex.workerCount; i++ {
+		// spin off worker
+		wg.Go(func() {
+			worker(ctx, ex.evaluator, targetQueue, resultCh)
+		})
 	}
-	consumerFunc()
 
 	// co-ordinator
-	coordinatorFunc := func() {
-		go func() {
-			wg.Wait()
-			close(resultCh)
-		}()
-	}
-	coordinatorFunc()
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
 
 	// process
 	return resultCh
