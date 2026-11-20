@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 // a fake evaluator
 type fakeEvaluator struct {
 	mu     sync.Mutex
-	calls  int
+	calls  map[string]int
 	status health.WorkloadStatus
 	err    error
 }
@@ -21,7 +22,7 @@ type fakeEvaluator struct {
 func (fe *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
 	defer fe.mu.Unlock()
 	fe.mu.Lock()
-	fe.calls++
+	fe.calls[t.ID]++
 	return fe.status, fe.err
 }
 
@@ -123,7 +124,7 @@ func TestExecutor_targetProcessedOnce(t *testing.T) {
 	}
 
 	// constructor
-	fe := &fakeEvaluator{}
+	fe := &fakeEvaluator{calls: make(map[string]int, cap(targets))}
 	excutr, err := New(5, 3, fe)
 	if err != nil {
 		t.Fatalf("expecting nil error, but got %v", err)
@@ -131,20 +132,29 @@ func TestExecutor_targetProcessedOnce(t *testing.T) {
 	if excutr == nil {
 		t.Fatalf("expecting non-nil executor, but got nil")
 	}
+	// run
 	resultCh := excutr.Run(t.Context(), targets)
+	var targetMap map[string]bool = make(map[string]bool, cap(targets))
 	for _, target := range targets {
-		select {
-		case result, ok := <-resultCh:
-			if !ok {
-				t.Fatalf("expecting channel to be open, got closed")
-			}
-			// assertion
-			if result.TargetID != target.ID {
-				t.Errorf("expecting target ID to match, but mismatched")
-			}
-			if result.TargetID == target.ID && fe.calls != 1 {
-				t.Errorf("expecting target to be called exactly once, but called %v times", fe.calls)
-			}
+		targetMap[target.ID] = true
+	}
+
+	for result := range resultCh {
+		// assert if error
+		if result.Err != nil {
+			t.Errorf("encounted error %v", result.Err)
+		}
+		// assert if result ID belongs to target list
+		if _, ok := targetMap[result.TargetID]; !ok {
+			t.Errorf("result ID to does not exist in the target list")
+		}
+		// assert if result status matches with evaluator status
+		if !reflect.DeepEqual(fe.status, result.Status) {
+			t.Errorf("expecting status to be %v, got %v", fe.status, result.Status)
+		}
+		// assert if calls are exactly once
+		if fe.calls[result.TargetID] != 1 {
+			t.Errorf("expecting target to be processed once, got %v", fe.calls)
 		}
 	}
 

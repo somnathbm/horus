@@ -111,7 +111,7 @@ func (ex *Executor) Run(ctx context.Context, targets []target.Target) <-chan Res
 	}()
 
 	// consumer
-	for i := 1; i <= ex.workerCount; i++ {
+	for range ex.workerCount {
 		// spin off worker
 		wg.Go(func() {
 			worker(ctx, ex.evaluator, targetQueue, resultCh)
