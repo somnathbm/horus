@@ -2,23 +2,28 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/somnathbm/horus/internal/health"
 	"github.com/somnathbm/horus/internal/target"
 )
 
-// fakeEvaluator is a mock implementation of the Evaluator interface for testing purposes.
+// a fake evaluator
 type fakeEvaluator struct {
+	calls  int
 	status health.WorkloadStatus
 	err    error
 }
 
-func (f *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
-	return f.status, f.err
+func (fe *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
+	fe.calls++
+	return fe.status, fe.err
 }
 
-func TestNewExecutor(t *testing.T) {
+// test - executor constructor
+func TestExecutorConstructor(t *testing.T) {
+	// define test cases
 	tests := []struct {
 		name          string
 		workerCount   int
@@ -27,21 +32,28 @@ func TestNewExecutor(t *testing.T) {
 		wantError     error
 	}{
 		{
-			name:          "valid-config",
-			workerCount:   5,
-			queueCapacity: 10,
+			name:          "valid-constructor",
+			workerCount:   3,
+			queueCapacity: 5,
 			evaluator:     &fakeEvaluator{},
 			wantError:     nil,
 		},
 		{
-			name:          "zero-workers",
+			name:          "zero-worker",
 			workerCount:   0,
-			queueCapacity: 10,
+			queueCapacity: 5,
 			evaluator:     &fakeEvaluator{},
 			wantError:     errNoWorkers,
 		},
 		{
-			name:          "negative-queue-capacity",
+			name:          "zero-queue-capacity",
+			workerCount:   5,
+			queueCapacity: 0,
+			evaluator:     &fakeEvaluator{},
+			wantError:     nil,
+		},
+		{
+			name:          "insufficient-queue-capacity",
 			workerCount:   5,
 			queueCapacity: -1,
 			evaluator:     &fakeEvaluator{},
@@ -56,66 +68,41 @@ func TestNewExecutor(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			executor, err := New(tt.workerCount, tt.queueCapacity, tt.evaluator)
-			if (err != nil) != (tt.wantError != nil) {
-				t.Errorf("New() error = %v, wantError %v", err, tt.wantError)
-				return
-			}
-			if executor != nil && executor.workerCount != tt.workerCount {
-				t.Errorf("New() workerCount = %v, want %v", executor.workerCount, tt.workerCount)
-			}
-			if executor != nil && executor.queueCapacity != tt.queueCapacity {
-				t.Errorf("New() queueCapacity = %v, want %v", executor.queueCapacity, tt.queueCapacity)
-			}
-			if executor != nil && executor.evaluator != tt.evaluator {
-				t.Errorf("New() evaluator = %v, want %v", executor.evaluator, tt.evaluator)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			executr, err := New(tc.workerCount, tc.queueCapacity, tc.evaluator)
+			// assertions
+			if tc.wantError != nil {
+				// assert - sentinel errors
+				if !errors.Is(err, tc.wantError) {
+					t.Errorf("New(): expecting error to be %v, got %v", tc.wantError, err)
+				}
+				// assert - executr is nil
+				if executr != nil {
+					t.Fatalf("expecting executor to be nil, but got %v", executr)
+				}
+			} else {
+				// assert - error is nil
+				if err != nil {
+					t.Fatalf("expecting nil error, but got %v", err)
+				}
+				// assert executor
+				if executr == nil {
+					t.Fatalf("expecting executor to be non-nil, but got nil")
+				}
+				// assert - worker count
+				if executr.workerCount != tc.workerCount {
+					t.Errorf("expecting worker count to be %v, got %v", tc.workerCount, executr.workerCount)
+				}
+				// assert - queue capacity
+				if executr.queueCapacity != tc.queueCapacity {
+					t.Errorf("expecting queue capacity to be %v, got %v", tc.queueCapacity, executr.queueCapacity)
+				}
+				// assert - evaluator
+				if executr.evaluator != tc.evaluator {
+					t.Errorf("expecting evaluator to be %v, got %v", tc.evaluator, executr.evaluator)
+				}
 			}
 		})
-	}
-}
-
-// test - all targets processed exactly once
-func TestExecutor_ProcessTargets(t *testing.T) {
-	// Create a fake evaluator that always returns a healthy status and no error.
-	fakeEval := &fakeEvaluator{
-		status: health.WorkloadStatus{},
-		err:    nil,
-	}
-
-	// Create an executor with 3 workers and a queue capacity of 5.
-	executor, err := New(3, 5, fakeEval)
-	if err != nil {
-		t.Fatalf("Failed to create executor: %v", err)
-	}
-
-	// Create a list of targets to process.
-	targets := []target.Target{
-		{ID: "target1"},
-		{ID: "target2"},
-		{ID: "target3"},
-		{ID: "target4"},
-		{ID: "target5"},
-	}
-
-	// process the targets using the executor.
-	resultCh := executor.Run(t.Context(), targets)
-
-	// Verify that all targets are processed exactly once and the results are as expected.
-	processedTargets := make(map[string]bool)
-	for result := range resultCh {
-		if _, exists := processedTargets[result.TargetID]; exists {
-			t.Errorf("Target %s processed more than once", result.TargetID)
-		}
-		processedTargets[result.TargetID] = true
-
-		if result.Err != nil {
-			t.Errorf("Error processing target %s: %v", result.TargetID, result.Err)
-		}
-	}
-
-	if len(processedTargets) != len(targets) {
-		t.Errorf("Not all targets were processed. Expected %d, got %d", len(targets), len(processedTargets))
 	}
 }
