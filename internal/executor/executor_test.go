@@ -8,6 +8,16 @@ import (
 	"github.com/somnathbm/horus/internal/target"
 )
 
+// fakeEvaluator is a mock implementation of the Evaluator interface for testing purposes.
+type fakeEvaluator struct {
+	status health.WorkloadStatus
+	err    error
+}
+
+func (f *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
+	return f.status, f.err
+}
+
 func TestNewExecutor(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -64,16 +74,6 @@ func TestNewExecutor(t *testing.T) {
 			}
 		})
 	}
-}
-
-// fakeEvaluator is a mock implementation of the Evaluator interface for testing purposes.
-type fakeEvaluator struct {
-	status health.WorkloadStatus
-	err    error
-}
-
-func (f *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
-	return f.status, f.err
 }
 
 // test - all targets processed exactly once
