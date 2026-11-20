@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/somnathbm/horus/internal/health"
@@ -11,12 +12,15 @@ import (
 
 // a fake evaluator
 type fakeEvaluator struct {
+	mu     sync.Mutex
 	calls  int
 	status health.WorkloadStatus
 	err    error
 }
 
 func (fe *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
+	defer fe.mu.Unlock()
+	fe.mu.Lock()
 	fe.calls++
 	return fe.status, fe.err
 }
@@ -105,4 +109,43 @@ func TestExecutorConstructor(t *testing.T) {
 			}
 		})
 	}
+}
+
+// test - all targets processed exactly once
+func TestExecutor_targetProcessedOnce(t *testing.T) {
+	// sample targets
+	targets := []target.Target{
+		{ID: "target1"},
+		{ID: "target2"},
+		{ID: "target3"},
+		{ID: "target4"},
+		{ID: "target5"},
+	}
+
+	// constructor
+	fe := &fakeEvaluator{}
+	excutr, err := New(5, 3, fe)
+	if err != nil {
+		t.Fatalf("expecting nil error, but got %v", err)
+	}
+	if excutr == nil {
+		t.Fatalf("expecting non-nil executor, but got nil")
+	}
+	resultCh := excutr.Run(t.Context(), targets)
+	for _, target := range targets {
+		select {
+		case result, ok := <-resultCh:
+			if !ok {
+				t.Fatalf("expecting channel to be open, got closed")
+			}
+			// assertion
+			if result.TargetID != target.ID {
+				t.Errorf("expecting target ID to match, but mismatched")
+			}
+			if result.TargetID == target.ID && fe.calls != 1 {
+				t.Errorf("expecting target to be called exactly once, but called %v times", fe.calls)
+			}
+		}
+	}
+
 }
