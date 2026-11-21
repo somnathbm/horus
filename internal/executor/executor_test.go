@@ -11,6 +11,11 @@ import (
 	"github.com/somnathbm/horus/internal/target"
 )
 
+// local sentinel
+var (
+	errFakeEvaluation = errors.New("fake evaluation failure")
+)
+
 // a fake evaluator
 type fakeEvaluator struct {
 	mu     sync.RWMutex
@@ -186,3 +191,75 @@ func TestExecutor_targetProcessedOnce(t *testing.T) {
 		}
 	}
 }
+
+// test - evaluator error propagation
+func TestExecutor_evaluatorError(t *testing.T) {
+	// sample targets
+	targets := []target.Target{
+		{ID: "target123"},
+	}
+
+	// constructor
+	fe := &fakeEvaluator{
+		calls: make(map[string]int, cap(targets)),
+		status: health.WorkloadStatus{
+			TargetID: "target123",
+			State:    health.StateUnknown,
+			Reason:   "partial observation",
+		},
+		err: errFakeEvaluation,
+	}
+	excutr, err := New(5, 3, fe)
+	if err != nil {
+		t.Fatalf("expecting nil error, but got %v", err)
+	}
+	if excutr == nil {
+		t.Fatalf("expecting non-nil executor, but got nil")
+	}
+
+	// run
+	resultCh := excutr.Run(t.Context(), targets)
+	var expectedMap map[string]bool = make(map[string]bool, cap(targets))
+	var seenMap map[string]int = make(map[string]int, cap(targets))
+	for _, target := range targets {
+		expectedMap[target.ID] = true
+	}
+
+	// collect results
+	for result := range resultCh {
+		// assert if error
+		if result.Err != nil && !errors.Is(result.Err, errFakeEvaluation) {
+			t.Errorf("expecting error to be %v, got %v", errFakeEvaluation, result.Err)
+		}
+		// assert - result.target exists in expected map
+		if _, ok := expectedMap[result.TargetID]; !ok {
+			t.Errorf("target %q from result is not expected", result.TargetID)
+		}
+		seenMap[result.TargetID]++
+		// assert - seen target ID count exactly 1
+		if seenMap[result.TargetID] > 1 {
+			t.Errorf("expecting target %q to be processed only 1, got %v", result.TargetID, seenMap[result.TargetID])
+		}
+		// assert - result status matches with evaluator status
+		if !reflect.DeepEqual(fe.status, result.Status) {
+			t.Errorf("expecting status to be %v, got %v", fe.status, result.Status)
+		}
+	}
+
+	// after resultCh is closed
+	for k := range expectedMap {
+		// assert - not processed or duplicate processed target
+		if seenMap[k] != 1 {
+			t.Errorf("expecting exactly one result from target %q, got %d", k, seenMap[k])
+		}
+		// assert - target is called exactly once
+		callCount := fe.CallCount(k)
+		if callCount != 1 {
+			t.Errorf("expecting target %q to be processed once, got %v", k, callCount)
+		}
+	}
+}
+
+// test - pre-cancelled context
+// test - zero targets
+// test - mid-run cancellation
