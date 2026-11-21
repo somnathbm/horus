@@ -130,7 +130,13 @@ func TestExecutor_targetProcessedOnce(t *testing.T) {
 	}
 
 	// constructor
-	fe := &fakeEvaluator{calls: make(map[string]int, cap(targets))}
+	fe := &fakeEvaluator{
+		calls: make(map[string]int, cap(targets)),
+		status: health.WorkloadStatus{
+			State:  health.StateUnknown,
+			Reason: "target inspection not implemented",
+		},
+	}
 	excutr, err := New(5, 3, fe)
 	if err != nil {
 		t.Fatalf("expecting nil error, but got %v", err)
@@ -140,33 +146,42 @@ func TestExecutor_targetProcessedOnce(t *testing.T) {
 	}
 	// run
 	resultCh := excutr.Run(t.Context(), targets)
-	var targetMap map[string]bool = make(map[string]bool, cap(targets))
+	var expectedMap map[string]bool = make(map[string]bool, cap(targets))
+	var seenMap map[string]int = make(map[string]int, cap(targets))
+	for _, target := range targets {
+		expectedMap[target.ID] = true
+	}
 
 	for result := range resultCh {
 		// assert if error
 		if result.Err != nil {
 			t.Errorf("encounted error %v", result.Err)
 		}
-		// if some target is missing, the map will be shorter length than expected targets lenght
-		// if some targets are duplicated, the map will still be shorter
-		// which will be asserted after the loop
-		for range targets {
-			targetMap[result.TargetID] = true
+		// assert - result.target exists in expected map
+		if _, ok := expectedMap[result.TargetID]; !ok {
+			t.Errorf("target %q from result is not expected", result.TargetID)
 		}
+		seenMap[result.TargetID]++
+		// assert - seen target ID count exactly 1
+		if seenMap[result.TargetID] > 1 {
+			t.Errorf("expecting target %q to be processed only 1, got %v", result.TargetID, seenMap[result.TargetID])
+		}
+
 		// assert - result status matches with evaluator status
 		if !reflect.DeepEqual(fe.status, result.Status) {
 			t.Errorf("expecting status to be %v, got %v", fe.status, result.Status)
 		}
-		// assert - target is called exactly once
-		callCount := fe.CallCount(result.TargetID)
-		if callCount != 1 {
-			t.Errorf("expecting target %q to be processed once, got %v", result.TargetID, callCount)
-		}
 	}
 
 	// after resultCh is closed
-	// assert - target == results
-	if len(targets) != len(targetMap) {
-		t.Errorf("expecting %v results to match with %v targets", len(targets), len(targetMap))
+	for k, v := range expectedMap {
+		if seenMap[k] > 1 {
+			t.Errorf("expecting target %q to be processed only 1, got %v", k, v)
+		}
+		// assert - target is called exactly once
+		callCount := fe.CallCount(k)
+		if callCount != 1 {
+			t.Errorf("expecting target %q to be processed once, got %v", k, callCount)
+		}
 	}
 }
