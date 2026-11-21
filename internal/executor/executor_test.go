@@ -13,10 +13,16 @@ import (
 
 // a fake evaluator
 type fakeEvaluator struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	calls  map[string]int
 	status health.WorkloadStatus
 	err    error
+}
+
+func (fe *fakeEvaluator) CallCount(targetID string) int {
+	defer fe.mu.RUnlock()
+	fe.mu.RLock()
+	return fe.calls[targetID]
 }
 
 func (fe *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
@@ -135,27 +141,32 @@ func TestExecutor_targetProcessedOnce(t *testing.T) {
 	// run
 	resultCh := excutr.Run(t.Context(), targets)
 	var targetMap map[string]bool = make(map[string]bool, cap(targets))
-	for _, target := range targets {
-		targetMap[target.ID] = true
-	}
 
 	for result := range resultCh {
 		// assert if error
 		if result.Err != nil {
 			t.Errorf("encounted error %v", result.Err)
 		}
-		// assert if result ID belongs to target list
-		if _, ok := targetMap[result.TargetID]; !ok {
-			t.Errorf("result ID to does not exist in the target list")
+		// if some target is missing, the map will be shorter length than expected targets lenght
+		// if some targets are duplicated, the map will still be shorter
+		// which will be asserted after the loop
+		for range targets {
+			targetMap[result.TargetID] = true
 		}
-		// assert if result status matches with evaluator status
+		// assert - result status matches with evaluator status
 		if !reflect.DeepEqual(fe.status, result.Status) {
 			t.Errorf("expecting status to be %v, got %v", fe.status, result.Status)
 		}
-		// assert if calls are exactly once
-		if fe.calls[result.TargetID] != 1 {
-			t.Errorf("expecting target to be processed once, got %v", fe.calls)
+		// assert - target is called exactly once
+		callCount := fe.CallCount(result.TargetID)
+		if callCount != 1 {
+			t.Errorf("expecting target %q to be processed once, got %v", result.TargetID, callCount)
 		}
 	}
 
+	// after resultCh is closed
+	// assert - target == results
+	if len(targets) != len(targetMap) {
+		t.Errorf("expecting %v results to match with %v targets", len(targets), len(targetMap))
+	}
 }
