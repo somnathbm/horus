@@ -3,7 +3,9 @@ package executor
 import (
 	"context"
 	"errors"
+	"maps"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 
@@ -28,6 +30,11 @@ func (fe *fakeEvaluator) CallCount(targetID string) int {
 	defer fe.mu.RUnlock()
 	fe.mu.RLock()
 	return fe.calls[targetID]
+}
+func (fe *fakeEvaluator) TotalCalls() map[string]int {
+	defer fe.mu.RUnlock()
+	fe.mu.RLock()
+	return fe.calls
 }
 
 func (fe *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
@@ -262,7 +269,7 @@ func TestExecutor_evaluatorError(t *testing.T) {
 
 // test - pre-cancelled context
 func TestExecutor_preCancelledContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	// sample targets
 	targets := []target.Target{
 		{ID: "target123"},
@@ -272,10 +279,6 @@ func TestExecutor_preCancelledContext(t *testing.T) {
 	// constructor
 	fe := &fakeEvaluator{
 		calls: make(map[string]int, cap(targets)),
-		status: health.WorkloadStatus{
-			State:  health.StateUnknown,
-			Reason: "context already cancelled",
-		},
 	}
 	excutr, err := New(5, 3, fe)
 	if err != nil {
@@ -292,13 +295,15 @@ func TestExecutor_preCancelledContext(t *testing.T) {
 	resultCh := excutr.Run(ctx, targets)
 
 	// assert - closed channel
-	if _, ok := <-resultCh; ok {
-		t.Errorf("expecting channel to be closed, but remained open")
+	select {
+	case _, ok := <-resultCh:
+		if ok {
+			t.Fatalf("expecting closed result channel")
+		}
+	default:
+		t.Fatalf("expected result channel to be already closed")
 	}
-	// assert - result channel is empty
-	if len(resultCh) != 0 {
-		t.Errorf("expecting no results in the channel")
-	}
+
 	// assert - no evaluator calls
 	for _, target := range targets {
 		calls := fe.CallCount(target.ID)
@@ -309,4 +314,43 @@ func TestExecutor_preCancelledContext(t *testing.T) {
 }
 
 // test - zero targets
+func TestExecutor_zeroTargets(t *testing.T) {
+	// empty targets
+	targets := []target.Target{}
+
+	// constructor
+	fe := &fakeEvaluator{
+		calls: make(map[string]int, cap(targets)),
+	}
+
+	excutr, err := New(5, 3, fe)
+	if err != nil {
+		t.Fatalf("expecting nil error, but got %v", err)
+	}
+	if excutr == nil {
+		t.Fatalf("expecting non-nil executor, but got nil")
+	}
+
+	// run
+	resultCh := excutr.Run(t.Context(), targets)
+
+	// collect result
+	var resultCount int
+	for range resultCh {
+		resultCount++
+	}
+
+	// assert - no result should be there
+	if resultCount != 0 {
+		t.Errorf("expected no result, got %d", resultCount)
+	}
+
+	// assert - evaluator calls count
+	totalCalls := fe.TotalCalls()
+	totalCallSlice := slices.Collect(maps.Keys(totalCalls))
+	if len(totalCallSlice) != 0 {
+		t.Errorf("expected zero calls, got %d", len(totalCallSlice))
+	}
+}
+
 // test - mid-run cancellation
