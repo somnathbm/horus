@@ -174,9 +174,10 @@ func TestExecutor_targetProcessedOnce(t *testing.T) {
 	}
 
 	// after resultCh is closed
-	for k, v := range expectedMap {
-		if seenMap[k] > 1 {
-			t.Errorf("expecting target %q to be processed only 1, got %v", k, v)
+	for k := range expectedMap {
+		// assert - not processed or duplicate processed target
+		if seenMap[k] != 1 {
+			t.Errorf("expecting exactly one result from target %q, got %d", k, seenMap[k])
 		}
 		// assert - target is called exactly once
 		callCount := fe.CallCount(k)
