@@ -228,7 +228,7 @@ func TestExecutor_evaluatorError(t *testing.T) {
 	// collect results
 	for result := range resultCh {
 		// assert if error
-		if result.Err != nil && !errors.Is(result.Err, errFakeEvaluation) {
+		if !errors.Is(result.Err, errFakeEvaluation) {
 			t.Errorf("expecting error to be %v, got %v", errFakeEvaluation, result.Err)
 		}
 		// assert - result.target exists in expected map
@@ -261,5 +261,52 @@ func TestExecutor_evaluatorError(t *testing.T) {
 }
 
 // test - pre-cancelled context
+func TestExecutor_preCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	// sample targets
+	targets := []target.Target{
+		{ID: "target123"},
+		{ID: "target456"},
+	}
+
+	// constructor
+	fe := &fakeEvaluator{
+		calls: make(map[string]int, cap(targets)),
+		status: health.WorkloadStatus{
+			State:  health.StateUnknown,
+			Reason: "context already cancelled",
+		},
+	}
+	excutr, err := New(5, 3, fe)
+	if err != nil {
+		t.Fatalf("expecting nil error, but got %v", err)
+	}
+	if excutr == nil {
+		t.Fatalf("expecting non-nil executor, but got nil")
+	}
+
+	// cancel the context right before Run()
+	cancel()
+
+	// run
+	resultCh := excutr.Run(ctx, targets)
+
+	// assert - closed channel
+	if _, ok := <-resultCh; ok {
+		t.Errorf("expecting channel to be closed, but remained open")
+	}
+	// assert - result channel is empty
+	if len(resultCh) != 0 {
+		t.Errorf("expecting no results in the channel")
+	}
+	// assert - no evaluator calls
+	for _, target := range targets {
+		calls := fe.CallCount(target.ID)
+		if calls != 0 {
+			t.Errorf("expecting evaluator calls be zero, got %d", calls)
+		}
+	}
+}
+
 // test - zero targets
 // test - mid-run cancellation
