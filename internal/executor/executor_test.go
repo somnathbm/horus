@@ -84,7 +84,11 @@ type concurrentEvaluator struct {
 	mu         sync.RWMutex
 	activeEval int
 	maxEval    int
-	started    chan string
+
+	startEval  chan bool
+	finishEval chan bool
+	status     health.WorkloadStatus
+	err        error
 }
 
 // cleanup function
@@ -97,20 +101,22 @@ func (ce *concurrentEvaluator) cleanup() {
 }
 
 func (ce *concurrentEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
-	select {
-	case ce.started <- t.ID:
-		ce.mu.Lock()
-		ce.activeEval++
-		if ce.activeEval > ce.maxEval {
-			ce.maxEval = ce.activeEval
-		}
-		fmt.Println(ce.activeEval, ce.maxEval)
-		ce.mu.Unlock()
-	case <-ctx.Done():
-		ce.cleanup()
-		return health.WorkloadStatus{}, ctx.Err()
+	defer ce.cleanup()
+	ce.mu.Lock()
+	ce.activeEval++
+	if ce.activeEval > ce.maxEval {
+		ce.maxEval = ce.activeEval
 	}
-	return health.WorkloadStatus{}, ctx.Err()
+	fmt.Println(ce.activeEval, ce.maxEval)
+	ce.mu.Unlock()
+
+	select {
+	case ce.startEval <- true:
+	case <-ce.finishEval:
+		ce.cleanup()
+		return ce.status, ce.err
+	}
+	return ce.status, ce.err
 }
 
 // test - executor constructor
@@ -502,8 +508,6 @@ func TestExecutor_midRunCancellation(t *testing.T) {
 
 // test - parallelism
 func TestExecutor_parallelism(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-
 	// targets
 	targets := []target.Target{
 		{ID: "target01"},
@@ -530,7 +534,8 @@ func TestExecutor_parallelism(t *testing.T) {
 
 	// constructor
 	ce := &concurrentEvaluator{
-		started: make(chan string),
+		startEval:  make(chan bool),
+		finishEval: make(chan bool),
 	}
 
 	excutr, err := New(3, 5, ce)
@@ -542,14 +547,12 @@ func TestExecutor_parallelism(t *testing.T) {
 	}
 
 	// run
-	resultCh := excutr.Run(ctx, targets)
+	resultCh := excutr.Run(t.Context(), targets)
 
 	// collect started signal from all workers
 	for range excutr.workerCount {
-		<-ce.started
+		<-ce.startEval
 	}
-	// cancel context
-	cancel()
 
 	// assert
 	if ce.maxEval == 1 {
@@ -558,6 +561,9 @@ func TestExecutor_parallelism(t *testing.T) {
 	if ce.maxEval != excutr.workerCount {
 		t.Errorf("expecting max 3 concurrent eval, got %d", ce.maxEval)
 	}
+
+	// signal to finish evaluation
+	ce.finishEval <- true
 
 	for range resultCh {
 
