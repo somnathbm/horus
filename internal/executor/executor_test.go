@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -83,6 +84,7 @@ type concurrentEvaluator struct {
 	mu         sync.RWMutex
 	activeEval int
 	maxEval    int
+	started    chan string
 }
 
 // cleanup function
@@ -90,17 +92,24 @@ func (ce *concurrentEvaluator) cleanup() {
 	ce.mu.Lock()
 	ce.activeEval--
 	ce.mu.Unlock()
+	fmt.Println("after cleanup")
+	fmt.Println(ce.activeEval, ce.maxEval)
 }
 
 func (ce *concurrentEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
-	defer ce.cleanup()
-	ce.mu.Lock()
-	ce.activeEval++
-	if ce.activeEval > ce.maxEval {
-		ce.maxEval = ce.activeEval
+	select {
+	case ce.started <- t.ID:
+		ce.mu.Lock()
+		ce.activeEval++
+		if ce.activeEval > ce.maxEval {
+			ce.maxEval = ce.activeEval
+		}
+		fmt.Println(ce.activeEval, ce.maxEval)
+		ce.mu.Unlock()
+	case <-ctx.Done():
+		ce.cleanup()
+		return health.WorkloadStatus{}, ctx.Err()
 	}
-	ce.mu.Unlock()
-	<-ctx.Done()
 	return health.WorkloadStatus{}, ctx.Err()
 }
 
@@ -493,6 +502,8 @@ func TestExecutor_midRunCancellation(t *testing.T) {
 
 // test - parallelism
 func TestExecutor_parallelism(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+
 	// targets
 	targets := []target.Target{
 		{ID: "target01"},
@@ -518,7 +529,9 @@ func TestExecutor_parallelism(t *testing.T) {
 	}
 
 	// constructor
-	ce := &concurrentEvaluator{}
+	ce := &concurrentEvaluator{
+		started: make(chan string),
+	}
 
 	excutr, err := New(3, 5, ce)
 	if err != nil {
@@ -529,18 +542,25 @@ func TestExecutor_parallelism(t *testing.T) {
 	}
 
 	// run
-	resultCh := excutr.Run(t.Context(), targets)
+	resultCh := excutr.Run(ctx, targets)
 
-	for range resultCh {
-
+	// collect started signal from all workers
+	for range excutr.workerCount {
+		<-ce.started
 	}
+	// cancel context
+	cancel()
 
 	// assert
-	if ce.maxEval != 1 {
+	if ce.maxEval == 1 {
 		t.Errorf("expecting more than 1 concurrent eval, got %d", ce.maxEval)
 	}
 	if ce.maxEval != excutr.workerCount {
 		t.Errorf("expecting max 3 concurrent eval, got %d", ce.maxEval)
+	}
+
+	for range resultCh {
+
 	}
 
 }
