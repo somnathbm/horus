@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -66,10 +67,14 @@ func (be *blockingEvaluator) TotalCallCount() int {
 }
 
 func (be *blockingEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
-	defer be.mu.Unlock()
-	be.mu.Lock()
-	be.calls[t.ID]++
-	be.started <- t.ID
+	select {
+	case be.started <- t.ID:
+		be.mu.Lock()
+		be.calls[t.ID]++
+		be.mu.Unlock()
+	case <-ctx.Done():
+		return health.WorkloadStatus{}, ctx.Err()
+	}
 	<-ctx.Done()
 	return health.WorkloadStatus{}, ctx.Err()
 }
@@ -394,7 +399,6 @@ Run starts normally
 */
 func TestExecutor_midRunCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
 
 	// empty targets
 	targets := []target.Target{
@@ -438,19 +442,16 @@ func TestExecutor_midRunCancellation(t *testing.T) {
 	resultCh := excutr.Run(ctx, targets)
 
 	// wait until 3 evaluation has started
-	evalCount := 0
-	for range <-be.started {
-		evalCount++
-		if evalCount == 3 {
-			cancel()
-			break
-		}
+	for range 3 {
+		<-be.started
 	}
+	cancel()
 
 	// drain resultCh until it eventually closes
 	resultCount := 0
-	for range resultCh {
+	for result := range resultCh {
 		resultCount++
+		fmt.Println(result)
 	}
 
 	// assertion - evaluator calls count
@@ -461,7 +462,7 @@ func TestExecutor_midRunCancellation(t *testing.T) {
 
 	// assertion - zero result emitted
 	if resultCount != 0 {
-		t.Errorf("expecting 0 calls, got %d", resultCount)
+		t.Errorf("expecting 0 results, got %d", resultCount)
 	}
 
 }
