@@ -3,9 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
-	"maps"
 	"reflect"
-	"slices"
 	"sync"
 	"testing"
 
@@ -31,10 +29,15 @@ func (fe *fakeEvaluator) CallCount(targetID string) int {
 	fe.mu.RLock()
 	return fe.calls[targetID]
 }
-func (fe *fakeEvaluator) TotalCalls() map[string]int {
+func (fe *fakeEvaluator) TotalCallCount() int {
 	defer fe.mu.RUnlock()
 	fe.mu.RLock()
-	return fe.calls
+
+	totalCount := 0
+	for _, v := range fe.calls {
+		totalCount += v
+	}
+	return totalCount
 }
 
 func (fe *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
@@ -42,6 +45,33 @@ func (fe *fakeEvaluator) Evaluate(ctx context.Context, t target.Target) (health.
 	fe.mu.Lock()
 	fe.calls[t.ID]++
 	return fe.status, fe.err
+}
+
+// blocking evaluator
+type blockingEvaluator struct {
+	mu      sync.RWMutex
+	calls   map[string]int
+	started chan string
+}
+
+func (be *blockingEvaluator) TotalCallCount() int {
+	defer be.mu.RUnlock()
+	be.mu.RLock()
+
+	totalCount := 0
+	for _, v := range be.calls {
+		totalCount += v
+	}
+	return totalCount
+}
+
+func (be *blockingEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
+	defer be.mu.Unlock()
+	be.mu.Lock()
+	be.calls[t.ID]++
+	be.started <- t.ID
+	<-ctx.Done()
+	return health.WorkloadStatus{}, ctx.Err()
 }
 
 // test - executor constructor
@@ -346,11 +376,92 @@ func TestExecutor_zeroTargets(t *testing.T) {
 	}
 
 	// assert - evaluator calls count
-	totalCalls := fe.TotalCalls()
-	totalCallSlice := slices.Collect(maps.Keys(totalCalls))
-	if len(totalCallSlice) != 0 {
-		t.Errorf("expected zero calls, got %d", len(totalCallSlice))
+	totalCalls := fe.TotalCallCount()
+	if totalCalls != 0 {
+		t.Errorf("expected zero calls, got %d", totalCalls)
 	}
 }
 
 // test - mid-run cancellation
+/*
+Run starts normally
+→ some targets begin evaluation
+→ context is cancelled while work is still in flight
+→ producer stops enqueueing
+→ workers stop
+→ result channel eventually closes
+→ not all targets are evaluated
+*/
+func TestExecutor_midRunCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// empty targets
+	targets := []target.Target{
+		{ID: "target01"},
+		{ID: "target02"},
+		{ID: "target03"},
+		{ID: "target04"},
+		{ID: "target05"},
+		{ID: "target06"},
+		{ID: "target07"},
+		{ID: "target08"},
+		{ID: "target09"},
+		{ID: "target10"},
+		{ID: "target11"},
+		{ID: "target12"},
+		{ID: "target13"},
+		{ID: "target14"},
+		{ID: "target15"},
+		{ID: "target16"},
+		{ID: "target17"},
+		{ID: "target18"},
+		{ID: "target19"},
+		{ID: "target20"},
+	}
+
+	// constructor
+	be := &blockingEvaluator{
+		calls:   make(map[string]int, cap(targets)),
+		started: make(chan string),
+	}
+
+	excutr, err := New(3, 5, be)
+	if err != nil {
+		t.Fatalf("expecting nil error, but got %v", err)
+	}
+	if excutr == nil {
+		t.Fatalf("expecting non-nil executor, but got nil")
+	}
+
+	// run
+	resultCh := excutr.Run(ctx, targets)
+
+	// wait until 3 evaluation has started
+	evalCount := 0
+	for range <-be.started {
+		evalCount++
+		if evalCount == 3 {
+			cancel()
+			break
+		}
+	}
+
+	// drain resultCh until it eventually closes
+	resultCount := 0
+	for range resultCh {
+		resultCount++
+	}
+
+	// assertion - evaluator calls count
+	callsCount := be.TotalCallCount()
+	if callsCount != 3 {
+		t.Errorf("expecting 3 calls, got %d", callsCount)
+	}
+
+	// assertion - zero result emitted
+	if resultCount != 0 {
+		t.Errorf("expecting 0 calls, got %d", resultCount)
+	}
+
+}
