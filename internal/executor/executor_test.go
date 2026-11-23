@@ -3,7 +3,6 @@ package executor
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -449,9 +448,8 @@ func TestExecutor_midRunCancellation(t *testing.T) {
 
 	// drain resultCh until it eventually closes
 	resultCount := 0
-	for result := range resultCh {
+	for range resultCh {
 		resultCount++
-		fmt.Println(result)
 	}
 
 	// assertion - evaluator calls count

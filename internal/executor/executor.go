@@ -66,6 +66,10 @@ func worker(ctx context.Context, eval Evaluator, targetQueue <-chan target.Targe
 				return
 			}
 			status, err := eval.Evaluate(ctx, target)
+			// for in-flight requests, result must not ommit
+			if err := ctx.Err(); err != nil {
+				return
+			}
 			// construct result
 			result := Result{
 				TargetID: target.ID,
