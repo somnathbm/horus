@@ -78,6 +78,32 @@ func (be *blockingEvaluator) Evaluate(ctx context.Context, t target.Target) (hea
 	return health.WorkloadStatus{}, ctx.Err()
 }
 
+// concurrent evaluator
+type concurrentEvaluator struct {
+	mu         sync.RWMutex
+	activeEval int
+	maxEval    int
+}
+
+// cleanup function
+func (ce *concurrentEvaluator) cleanup() {
+	ce.mu.Lock()
+	ce.activeEval--
+	ce.mu.Unlock()
+}
+
+func (ce *concurrentEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
+	defer ce.cleanup()
+	ce.mu.Lock()
+	ce.activeEval++
+	if ce.activeEval > ce.maxEval {
+		ce.maxEval = ce.activeEval
+	}
+	ce.mu.Unlock()
+	<-ctx.Done()
+	return health.WorkloadStatus{}, ctx.Err()
+}
+
 // test - executor constructor
 func TestExecutorConstructor(t *testing.T) {
 	// define test cases
@@ -399,7 +425,7 @@ Run starts normally
 func TestExecutor_midRunCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 
-	// empty targets
+	// targets
 	targets := []target.Target{
 		{ID: "target01"},
 		{ID: "target02"},
@@ -461,6 +487,60 @@ func TestExecutor_midRunCancellation(t *testing.T) {
 	// assertion - zero result emitted
 	if resultCount != 0 {
 		t.Errorf("expecting 0 results, got %d", resultCount)
+	}
+
+}
+
+// test - parallelism
+func TestExecutor_parallelism(t *testing.T) {
+	// targets
+	targets := []target.Target{
+		{ID: "target01"},
+		{ID: "target02"},
+		{ID: "target03"},
+		{ID: "target04"},
+		{ID: "target05"},
+		{ID: "target06"},
+		{ID: "target07"},
+		{ID: "target08"},
+		{ID: "target09"},
+		{ID: "target10"},
+		{ID: "target11"},
+		{ID: "target12"},
+		{ID: "target13"},
+		{ID: "target14"},
+		{ID: "target15"},
+		{ID: "target16"},
+		{ID: "target17"},
+		{ID: "target18"},
+		{ID: "target19"},
+		{ID: "target20"},
+	}
+
+	// constructor
+	ce := &concurrentEvaluator{}
+
+	excutr, err := New(3, 5, ce)
+	if err != nil {
+		t.Fatalf("expecting nil error, but got %v", err)
+	}
+	if excutr == nil {
+		t.Fatalf("expecting non-nil executor, but got nil")
+	}
+
+	// run
+	resultCh := excutr.Run(t.Context(), targets)
+
+	for range resultCh {
+
+	}
+
+	// assert
+	if ce.maxEval != 1 {
+		t.Errorf("expecting more than 1 concurrent eval, got %d", ce.maxEval)
+	}
+	if ce.maxEval != excutr.workerCount {
+		t.Errorf("expecting max 3 concurrent eval, got %d", ce.maxEval)
 	}
 
 }
