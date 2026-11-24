@@ -81,41 +81,38 @@ func (be *blockingEvaluator) Evaluate(ctx context.Context, t target.Target) (hea
 
 // concurrent evaluator
 type concurrentEvaluator struct {
-	mu         sync.RWMutex
-	activeEval int
-	maxEval    int
+	mu                sync.RWMutex
+	activeConcurrency int
+	maxConcurrency    int
 
-	startEval  chan bool
-	finishEval chan bool
-	status     health.WorkloadStatus
-	err        error
+	wg        sync.WaitGroup
+	startEval chan bool
+	status    health.WorkloadStatus
+	err       error
 }
 
 // cleanup function
 func (ce *concurrentEvaluator) cleanup() {
 	ce.mu.Lock()
-	ce.activeEval--
+	ce.activeConcurrency--
 	ce.mu.Unlock()
 	fmt.Println("after cleanup")
-	fmt.Println(ce.activeEval, ce.maxEval)
+	fmt.Println(ce.activeConcurrency, ce.maxConcurrency)
 }
 
 func (ce *concurrentEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
 	defer ce.cleanup()
 	ce.mu.Lock()
-	ce.activeEval++
-	if ce.activeEval > ce.maxEval {
-		ce.maxEval = ce.activeEval
+	ce.activeConcurrency++
+	if ce.activeConcurrency > ce.maxConcurrency {
+		ce.maxConcurrency = ce.activeConcurrency
 	}
-	fmt.Println(ce.activeEval, ce.maxEval)
+	fmt.Println(ce.activeConcurrency, ce.maxConcurrency)
 	ce.mu.Unlock()
 
-	select {
-	case ce.startEval <- true:
-	case <-ce.finishEval:
-		ce.cleanup()
-		return ce.status, ce.err
-	}
+	ce.wg.Done()
+	<-ce.startEval
+	fmt.Println("this line")
 	return ce.status, ce.err
 }
 
@@ -534,8 +531,8 @@ func TestExecutor_parallelism(t *testing.T) {
 
 	// constructor
 	ce := &concurrentEvaluator{
-		startEval:  make(chan bool),
-		finishEval: make(chan bool),
+		startEval: make(chan bool),
+		wg:        sync.WaitGroup{},
 	}
 
 	excutr, err := New(3, 5, ce)
@@ -546,27 +543,31 @@ func TestExecutor_parallelism(t *testing.T) {
 		t.Fatalf("expecting non-nil executor, but got nil")
 	}
 
+	// increment counter
+	ce.wg.Add(3)
+
 	// run
-	resultCh := excutr.Run(t.Context(), targets)
+	excutr.Run(t.Context(), targets)
 
-	// collect started signal from all workers
-	for range excutr.workerCount {
-		<-ce.startEval
+	// signal main goroutine to wait until workers signal a Done
+	ce.wg.Wait()
+
+	// assert - active
+	if ce.maxConcurrency == 1 {
+		t.Errorf("expecting more than 1 concurrent eval, got %d", ce.maxConcurrency)
+	}
+	if ce.maxConcurrency != excutr.workerCount {
+		t.Errorf("expecting max 3 concurrent eval, got %d", ce.maxConcurrency)
 	}
 
-	// assert
-	if ce.maxEval == 1 {
-		t.Errorf("expecting more than 1 concurrent eval, got %d", ce.maxEval)
-	}
-	if ce.maxEval != excutr.workerCount {
-		t.Errorf("expecting max 3 concurrent eval, got %d", ce.maxEval)
-	}
+	// release Evaluate()
+	ce.startEval <- true
+	ce.startEval <- true
+	ce.startEval <- true
 
-	// signal to finish evaluation
-	ce.finishEval <- true
+	// continue draining resultCh
+	// for range resultCh {
 
-	for range resultCh {
-
-	}
+	// }
 
 }
