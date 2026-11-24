@@ -3,7 +3,6 @@ package executor
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -96,8 +95,6 @@ func (ce *concurrentEvaluator) cleanup() {
 	ce.mu.Lock()
 	ce.activeConcurrency--
 	ce.mu.Unlock()
-	fmt.Println("after cleanup")
-	fmt.Println(ce.activeConcurrency, ce.maxConcurrency)
 }
 
 func (ce *concurrentEvaluator) Evaluate(ctx context.Context, t target.Target) (health.WorkloadStatus, error) {
@@ -107,12 +104,10 @@ func (ce *concurrentEvaluator) Evaluate(ctx context.Context, t target.Target) (h
 	if ce.activeConcurrency > ce.maxConcurrency {
 		ce.maxConcurrency = ce.activeConcurrency
 	}
-	fmt.Println(ce.activeConcurrency, ce.maxConcurrency)
 	ce.mu.Unlock()
 
 	ce.wg.Done()
 	<-ce.startEval
-	fmt.Println("this line")
 	return ce.status, ce.err
 }
 
@@ -535,10 +530,7 @@ func TestExecutor_parallelism(t *testing.T) {
 	// signal main goroutine to wait until workers signal a Done
 	ce.wg.Wait()
 
-	// assert - active
-	if ce.maxConcurrency == 1 {
-		t.Errorf("expecting more than 1 concurrent eval, got %d", ce.maxConcurrency)
-	}
+	// assert - active concurrency
 	if ce.maxConcurrency != excutr.workerCount {
 		t.Errorf("expecting max 3 concurrent eval, got %d", ce.maxConcurrency)
 	}
@@ -551,6 +543,11 @@ func TestExecutor_parallelism(t *testing.T) {
 	// continue draining resultCh
 	for range resultCh {
 
+	}
+
+	// final assertion - check cleanup() is called i.e. activeConcurrency reached zero
+	if ce.activeConcurrency != 0 {
+		t.Errorf("expecting zero concurrency after cleanup, got %d", ce.activeConcurrency)
 	}
 
 }
