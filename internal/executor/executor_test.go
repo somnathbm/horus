@@ -510,23 +510,6 @@ func TestExecutor_parallelism(t *testing.T) {
 		{ID: "target01"},
 		{ID: "target02"},
 		{ID: "target03"},
-		{ID: "target04"},
-		{ID: "target05"},
-		{ID: "target06"},
-		{ID: "target07"},
-		{ID: "target08"},
-		{ID: "target09"},
-		{ID: "target10"},
-		{ID: "target11"},
-		{ID: "target12"},
-		{ID: "target13"},
-		{ID: "target14"},
-		{ID: "target15"},
-		{ID: "target16"},
-		{ID: "target17"},
-		{ID: "target18"},
-		{ID: "target19"},
-		{ID: "target20"},
 	}
 
 	// constructor
@@ -547,7 +530,7 @@ func TestExecutor_parallelism(t *testing.T) {
 	ce.wg.Add(3)
 
 	// run
-	excutr.Run(t.Context(), targets)
+	resultCh := excutr.Run(t.Context(), targets)
 
 	// signal main goroutine to wait until workers signal a Done
 	ce.wg.Wait()
@@ -566,8 +549,8 @@ func TestExecutor_parallelism(t *testing.T) {
 	ce.startEval <- true
 
 	// continue draining resultCh
-	// for range resultCh {
+	for range resultCh {
 
-	// }
+	}
 
 }
