@@ -6,6 +6,16 @@ type DiscoveryConfig struct {
 	AWS        []AWSSourceConfig        `yaml:"aws"`
 }
 
+type DiscoverySourceConfig struct {
+	Sources DiscoveryConfig `yaml:"sources"`
+}
+
+type ExecutionConfig struct {
+	Workers             int `yaml:"workers"`
+	TargetQueueCapacity int `yaml:"targetQueueCapacity"`
+}
+
 type AppConfig struct {
-	Discovery DiscoveryConfig `yaml:"discovery"`
+	Discovery DiscoverySourceConfig `yaml:"discovery"`
+	Execution ExecutionConfig       `yaml:"execution"`
 }

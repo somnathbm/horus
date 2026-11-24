@@ -31,14 +31,16 @@ func TestConfigLoader(t *testing.T) {
 		{
 			"valid-config-file",
 			"application.yaml",
-			"discovery:\n  local:\n    - name: local-dev\n      path: /data\n\n",
+			"discovery:\n  sources:\n    local:\n      - name: \"      local-dev \"\n        path: examples/targets",
 			true,
 			false,
 			nil,
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{
-						{Name: "local-dev", Path: "/data"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "local-dev", Path: "examples/targets"},
+						},
 					},
 				},
 			},
@@ -73,7 +75,7 @@ func TestConfigLoader(t *testing.T) {
 		{
 			"valid-invalid-semantic-file",
 			"invalid-semantic.yaml",
-			"discovery:\n  aws:\n    - name: dev-acount\n      accountID: 123\n\n",
+			"discovery:\n  sources:\n    aws:\n      - name: dev-account\n        accountID: \"123        \"\n        region: us-east-1",
 			true,
 			true,
 			ErrInvalidAccountID,
@@ -87,9 +89,11 @@ func TestConfigLoader(t *testing.T) {
 			true,
 			nil,
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "/data"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "/data"},
+						},
 					},
 				},
 			},
