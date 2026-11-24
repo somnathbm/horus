@@ -84,10 +84,10 @@ type concurrentEvaluator struct {
 	activeConcurrency int
 	maxConcurrency    int
 
-	wg        sync.WaitGroup
-	startEval chan bool
-	status    health.WorkloadStatus
-	err       error
+	wg          sync.WaitGroup
+	releaseEval chan bool
+	status      health.WorkloadStatus
+	err         error
 }
 
 // cleanup function
@@ -107,7 +107,12 @@ func (ce *concurrentEvaluator) Evaluate(ctx context.Context, t target.Target) (h
 	ce.mu.Unlock()
 
 	ce.wg.Done()
-	<-ce.startEval
+
+	select {
+	case <-ce.releaseEval:
+	case <-ctx.Done():
+		return health.WorkloadStatus{}, ctx.Err()
+	}
 	return ce.status, ce.err
 }
 
@@ -509,8 +514,8 @@ func TestExecutor_parallelism(t *testing.T) {
 
 	// constructor
 	ce := &concurrentEvaluator{
-		startEval: make(chan bool),
-		wg:        sync.WaitGroup{},
+		releaseEval: make(chan bool),
+		wg:          sync.WaitGroup{},
 	}
 
 	excutr, err := New(3, 5, ce)
@@ -536,9 +541,7 @@ func TestExecutor_parallelism(t *testing.T) {
 	}
 
 	// release Evaluate()
-	ce.startEval <- true
-	ce.startEval <- true
-	ce.startEval <- true
+	close(ce.releaseEval)
 
 	// continue draining resultCh
 	for range resultCh {
