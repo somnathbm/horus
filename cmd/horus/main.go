@@ -11,6 +11,7 @@ import (
 	"github.com/somnathbm/horus/internal/discovery"
 	"github.com/somnathbm/horus/internal/discovery/local"
 	"github.com/somnathbm/horus/internal/engine"
+	"github.com/somnathbm/horus/internal/executor"
 	"github.com/somnathbm/horus/internal/plugin"
 	"github.com/somnathbm/horus/internal/registry"
 	"github.com/somnathbm/horus/internal/target"
@@ -36,7 +37,7 @@ func main() {
 	discoveryConfig := appConfig.Discovery
 
 	// local config
-	for _, localConfig := range discoveryConfig.Local {
+	for _, localConfig := range discoveryConfig.Sources.Local {
 		discoverers = append(discoverers, local.New(localConfig))
 	}
 
@@ -64,14 +65,26 @@ func main() {
 
 	// 6. instantiate engine and evaluate discovered targets
 	eng := engine.New(reg)
-	// iterate over discovered targets and evaluate them
-	for _, t := range dscvryRslt.Targets {
-		status, err := eng.Evaluate(ctx, t)
-		if err != nil {
-			fmt.Printf("target %v: %v\n", t.Name, err)
-		} else {
-			fmt.Printf("target: %q\nstatus: %v\nreason: %v\n", t.Name, status.State, status.Reason)
-		}
+
+	// 7. instantiate executor
+	exec, execErr := executor.New(10, 1000, eng)
+	if execErr != nil {
+		log.Fatalf("execution: %v", execErr)
 	}
+	resultStream := exec.Run(ctx, dscvryRslt.Targets)
+
+	for result := range resultStream {
+		fmt.Println(result)
+	}
+
+	// iterate over discovered targets and evaluate them
+	// for _, t := range dscvryRslt.Targets {
+	// 	status, err := eng.Evaluate(ctx, t)
+	// 	if err != nil {
+	// 		fmt.Printf("target %v: %v\n", t.Name, err)
+	// 	} else {
+	// 		fmt.Printf("target: %q\nstatus: %v\nreason: %v\n", t.Name, status.State, status.Reason)
+	// 	}
+	// }
 
 }
