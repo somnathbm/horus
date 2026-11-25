@@ -10,12 +10,14 @@ import (
 )
 
 var (
-	ErrNoDiscoverySources = errors.New("no discovery sources found")
-	ErrNoSourceName       = errors.New("source name is required")
-	ErrInvalidFilePath    = errors.New("valid absolute file path is required")
-	ErrInvalidClusterURL  = errors.New("valid URL is required")
-	ErrInvalidAccountID   = errors.New("valid 12-digit accountID is required")
-	ErrInvalidAWSRegion   = errors.New("valid aws region is required")
+	ErrNoDiscoverySources        = errors.New("no discovery sources found")
+	ErrNoSourceName              = errors.New("source name is required")
+	ErrInvalidFilePath           = errors.New("valid absolute file path is required")
+	ErrInvalidClusterURL         = errors.New("valid URL is required")
+	ErrInvalidAccountID          = errors.New("valid 12-digit accountID is required")
+	ErrInvalidAWSRegion          = errors.New("valid aws region is required")
+	ErrInvalidWorkerConfig       = errors.New("worker should be at least 1")
+	ErrInsufficientQueueCapacity = errors.New("queue capacity cannot be negative")
 )
 
 var reAccountID = regexp.MustCompile(`^\d{12}$`)
@@ -24,12 +26,15 @@ var allowedSchemes = []string{"http", "https"}
 // Validate semantics for the config
 func validateConfig(appConfig AppConfig) (AppConfig, error) {
 	// if no discovery sources are configured
-	if len(appConfig.Discovery.Local) == 0 && len(appConfig.Discovery.Kubernetes) == 0 && len(appConfig.Discovery.AWS) == 0 {
+	if len(appConfig.Discovery.Sources.Local) == 0 && len(appConfig.Discovery.Sources.Kubernetes) == 0 && len(appConfig.Discovery.Sources.AWS) == 0 {
 		return AppConfig{}, fmt.Errorf("app.discovery: %w", ErrNoDiscoverySources)
 	}
 
-	sources := appConfig.Discovery
+	// discovery sources
+	sources := appConfig.Discovery.Sources
+	executionConfig := appConfig.Execution
 
+	// local
 	for i, local := range sources.Local {
 		sources.Local[i].Name = strings.TrimSpace(local.Name)
 		sources.Local[i].Path = strings.TrimSpace(local.Path)
@@ -72,6 +77,16 @@ func validateConfig(appConfig AppConfig) (AppConfig, error) {
 		}
 		if sources.AWS[i].Region == "" {
 			return AppConfig{}, fmt.Errorf("discovery.aws[%v]: %w", i, ErrInvalidAWSRegion)
+		}
+	}
+
+	// execution config - if set in yaml
+	if executionConfig != nil {
+		if executionConfig.Workers == 0 {
+			return AppConfig{}, fmt.Errorf("execution: %w", ErrInvalidWorkerConfig)
+		}
+		if executionConfig.TargetQueueCapacity < 0 {
+			return AppConfig{}, fmt.Errorf("execution: %w", ErrInsufficientQueueCapacity)
 		}
 	}
 

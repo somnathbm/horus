@@ -1,13 +1,18 @@
+execution:
+  workers: 3
+  targetQueueCapacity: 5
+
 discovery:
-  local:
-    - name: "      local-dev "
-      path: examples/targets
+  sources:
+    local:
+      - name: "local-dev"
+        path: examples/targets
 
-  # kubernetes:
-  #   - name: dev-cluster
-  #     clusterURL: "https://e664455.eks.cluster"
+    kubernetes:
+      - name: dev-cluster
+        clusterURL: "https://e664455.eks.cluster"
 
-  # aws:
-  #   - name: dev-account
-  #     accountID: "485423766756        "
-  #     region: us-east-1
+    aws:
+      - name: dev-account
+        accountID: "485423766756        "
+        region: us-east-1

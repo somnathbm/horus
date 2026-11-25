@@ -6,6 +6,16 @@ type DiscoveryConfig struct {
 	AWS        []AWSSourceConfig        `yaml:"aws"`
 }
 
+type DiscoverySourceConfig struct {
+	Sources DiscoveryConfig `yaml:"sources" validate:"required"`
+}
+
+type ExecutionConfig struct {
+	Workers             int `yaml:"workers"`
+	TargetQueueCapacity int `yaml:"targetQueueCapacity"`
+}
+
 type AppConfig struct {
-	Discovery DiscoveryConfig `yaml:"discovery"`
+	Discovery DiscoverySourceConfig `yaml:"discovery" validate:"required"`
+	Execution *ExecutionConfig       `yaml:"execution" validate:"omitempty"`
 }

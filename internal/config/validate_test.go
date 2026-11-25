@@ -21,9 +21,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"local-config-no-name",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{
-						{Name: "", Path: "examples/targets"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "", Path: "examples/targets"},
+						},
 					},
 				},
 			},
@@ -32,9 +34,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"local-config-abs-path",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "/examples/targets"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "examples/targets"},
+						},
 					},
 				},
 			},
@@ -43,9 +47,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"local-config-empty-path",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "      \t"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "      \t"},
+						},
 					},
 				},
 			},
@@ -54,9 +60,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"local-valid-config",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "examples/targets"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "examples/targets"},
+						},
 					},
 				},
 			},
@@ -65,9 +73,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"k8s-config-empty-name",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Kubernetes: []KubernetesSourceConfig{
-						{Name: "    ", ClusterURL: "http://some-cluster.com"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Kubernetes: []KubernetesSourceConfig{
+							{Name: "    ", ClusterURL: "http://some-cluster.com"},
+						},
 					},
 				},
 			},
@@ -76,9 +86,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"k8s-config-empty-clusterurl",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Kubernetes: []KubernetesSourceConfig{
-						{Name: "dev-cluster", ClusterURL: "  "},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Kubernetes: []KubernetesSourceConfig{
+							{Name: "dev-cluster", ClusterURL: "  "},
+						},
 					},
 				},
 			},
@@ -87,9 +99,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"k8s-invalid-cluster",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Kubernetes: []KubernetesSourceConfig{
-						{Name: "dev-cluster", ClusterURL: "some-cluster.com"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Kubernetes: []KubernetesSourceConfig{
+							{Name: "dev-cluster", ClusterURL: "some-cluster.com"},
+						},
 					},
 				},
 			},
@@ -98,9 +112,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"k8s-valid-cluster",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Kubernetes: []KubernetesSourceConfig{
-						{Name: "dev-cluster", ClusterURL: "https://some-cluster.com"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Kubernetes: []KubernetesSourceConfig{
+							{Name: "dev-cluster", ClusterURL: "https://some-cluster.com"},
+						},
 					},
 				},
 			},
@@ -109,9 +125,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"aws-no-name",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					AWS: []AWSSourceConfig{
-						{Name: "", AccountID: "123445558123", Region: "us-east-1"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						AWS: []AWSSourceConfig{
+							{Name: "", AccountID: "123445558123", Region: "us-east-1"},
+						},
 					},
 				},
 			},
@@ -120,9 +138,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"aws-nondigit-accountid",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					AWS: []AWSSourceConfig{
-						{Name: "dev-account", AccountID: "12fc55bm1234", Region: "us-east-1"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						AWS: []AWSSourceConfig{
+							{Name: "dev-account", AccountID: "12fc55bm1234", Region: "us-east-1"},
+						},
 					},
 				},
 			},
@@ -131,9 +151,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"aws-invalid-account-no-region",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					AWS: []AWSSourceConfig{
-						{Name: "dev-account", AccountID: "123445558"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						AWS: []AWSSourceConfig{
+							{Name: "dev-account", AccountID: "123445558"},
+						},
 					},
 				},
 			},
@@ -142,9 +164,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"aws-invalid-region",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					AWS: []AWSSourceConfig{
-						{Name: "dev-account", AccountID: "123445551234", Region: ""},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						AWS: []AWSSourceConfig{
+							{Name: "dev-account", AccountID: "123445551234", Region: ""},
+						},
 					},
 				},
 			},
@@ -153,9 +177,11 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"aws-valid-region",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					AWS: []AWSSourceConfig{
-						{Name: "dev-account", AccountID: "123445551234", Region: "us-east-1"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						AWS: []AWSSourceConfig{
+							{Name: "dev-account", AccountID: "123445551234", Region: "us-east-1"},
+						},
 					},
 				},
 			},
@@ -164,12 +190,14 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"valid-local-config-invalid-aws",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "examples/targets"},
-					},
-					AWS: []AWSSourceConfig{
-						{Name: "", AccountID: "12ac67893bg4"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "examples/targets"},
+						},
+						AWS: []AWSSourceConfig{
+							{Name: "", AccountID: "12ac67893bg4"},
+						},
 					},
 				},
 			},
@@ -178,10 +206,12 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"valid-local-config-relative-abs-path",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{
-						{Name: "dev-local", Path: "/examples/targets"},
-						{Name: "dev-staging", Path: "examples/staging"},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "examples/targets"},
+							{Name: "dev-staging", Path: "examples/staging"},
+						},
 					},
 				},
 			},
@@ -190,8 +220,10 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"empty-local-config",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local: []LocalSourceConfig{},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{},
+					},
 				},
 			},
 			ErrNoDiscoverySources,
@@ -199,13 +231,48 @@ func TestValidateConfigs(t *testing.T) {
 		{
 			"empty-config",
 			AppConfig{
-				Discovery: DiscoveryConfig{
-					Local:      []LocalSourceConfig{},
-					Kubernetes: []KubernetesSourceConfig{},
-					AWS:        []AWSSourceConfig{},
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local:      []LocalSourceConfig{},
+						Kubernetes: []KubernetesSourceConfig{},
+						AWS:        []AWSSourceConfig{},
+					},
 				},
 			},
 			ErrNoDiscoverySources,
+		},
+		{
+			"invalid-workercount",
+			AppConfig{
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "examples/targets"},
+						},
+					},
+				},
+				Execution: &ExecutionConfig{
+					Workers: 0,
+				},
+			},
+			ErrInvalidWorkerConfig,
+		},
+		{
+			"invalid-queue-capacity",
+			AppConfig{
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "examples/targets"},
+						},
+					},
+				},
+				Execution: &ExecutionConfig{
+					Workers:             3,
+					TargetQueueCapacity: -2,
+				},
+			},
+			ErrInsufficientQueueCapacity,
 		},
 	}
 
