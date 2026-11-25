@@ -35,6 +35,7 @@ func main() {
 	// 3. construct config -> discoverer
 	var discoverers []discovery.Discoverer
 	discoveryConfig := appConfig.Discovery
+	executionConfig := appConfig.Execution
 
 	// local config
 	for _, localConfig := range discoveryConfig.Sources.Local {
@@ -67,7 +68,13 @@ func main() {
 	eng := engine.New(reg)
 
 	// 7. instantiate executor
-	exec, execErr := executor.New(10, 1000, eng)
+	defaultWorkerCount := 3
+	defaultQueueCapacity := 5
+	if executionConfig != nil {
+		defaultWorkerCount = executionConfig.Workers
+		defaultQueueCapacity = executionConfig.TargetQueueCapacity
+	}
+	exec, execErr := executor.New(defaultWorkerCount, defaultQueueCapacity, eng)
 	if execErr != nil {
 		log.Fatalf("execution: %v", execErr)
 	}

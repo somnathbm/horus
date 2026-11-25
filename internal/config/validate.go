@@ -32,7 +32,9 @@ func validateConfig(appConfig AppConfig) (AppConfig, error) {
 
 	// discovery sources
 	sources := appConfig.Discovery.Sources
+	executionConfig := appConfig.Execution
 
+	// local
 	for i, local := range sources.Local {
 		sources.Local[i].Name = strings.TrimSpace(local.Name)
 		sources.Local[i].Path = strings.TrimSpace(local.Path)
@@ -78,17 +80,15 @@ func validateConfig(appConfig AppConfig) (AppConfig, error) {
 		}
 	}
 
-	// execution validation
-	// if appConfig.Execution != nil {
-	// exec := appConfig.Execution
-
-	// if exec.Workers == 0 {
-	// 	return AppConfig{}, fmt.Errorf("execution: %w", ErrInvalidWorkerConfig)
-	// }
-	// if exec.TargetQueueCapacity < 0 {
-	// 	return AppConfig{}, fmt.Errorf("execution: %w", ErrInsufficientQueueCapacity)
-	// }
-	// }
+	// execution config - if set in yaml
+	if executionConfig != nil {
+		if executionConfig.Workers == 0 {
+			return AppConfig{}, fmt.Errorf("execution: %w", ErrInvalidWorkerConfig)
+		}
+		if executionConfig.TargetQueueCapacity < 0 {
+			return AppConfig{}, fmt.Errorf("execution: %w", ErrInsufficientQueueCapacity)
+		}
+	}
 
 	return appConfig, nil
 }

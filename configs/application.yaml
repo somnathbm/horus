@@ -1,11 +1,11 @@
 execution:
-  workers: 10
-  targetQueueCapacity: 1000
+  workers: 3
+  targetQueueCapacity: 5
 
 discovery:
   sources:
     local:
-      - name: "      local-dev "
+      - name: "local-dev"
         path: examples/targets
 
     kubernetes:

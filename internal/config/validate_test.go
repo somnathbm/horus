@@ -241,22 +241,39 @@ func TestValidateConfigs(t *testing.T) {
 			},
 			ErrNoDiscoverySources,
 		},
-		// {
-		// 	"invalid-workercount",
-		// 	AppConfig{
-		// 		Discovery: DiscoverySourceConfig{
-		// 			Sources: DiscoveryConfig{
-		// 				Local: []LocalSourceConfig{
-		// 					{Name: "dev-local", Path: "examples/targets"},
-		// 				},
-		// 			},
-		// 		},
-		// 		Execution: ExecutionConfig{
-		// 			Workers: 0,
-		// 		},
-		// 	},
-		// 	ErrInvalidWorkerConfig,
-		// },
+		{
+			"invalid-workercount",
+			AppConfig{
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "examples/targets"},
+						},
+					},
+				},
+				Execution: &ExecutionConfig{
+					Workers: 0,
+				},
+			},
+			ErrInvalidWorkerConfig,
+		},
+		{
+			"invalid-queue-capacity",
+			AppConfig{
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "dev-local", Path: "examples/targets"},
+						},
+					},
+				},
+				Execution: &ExecutionConfig{
+					Workers:             3,
+					TargetQueueCapacity: -2,
+				},
+			},
+			ErrInsufficientQueueCapacity,
+		},
 	}
 
 	// run test

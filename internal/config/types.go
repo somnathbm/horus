@@ -7,7 +7,7 @@ type DiscoveryConfig struct {
 }
 
 type DiscoverySourceConfig struct {
-	Sources DiscoveryConfig `yaml:"sources"`
+	Sources DiscoveryConfig `yaml:"sources" validate:"required"`
 }
 
 type ExecutionConfig struct {
@@ -16,6 +16,6 @@ type ExecutionConfig struct {
 }
 
 type AppConfig struct {
-	Discovery DiscoverySourceConfig `yaml:"discovery"`
-	Execution ExecutionConfig       `yaml:"execution"`
+	Discovery DiscoverySourceConfig `yaml:"discovery" validate:"required"`
+	Execution *ExecutionConfig       `yaml:"execution" validate:"omitempty"`
 }

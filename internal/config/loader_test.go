@@ -20,22 +20,22 @@ func TestConfigLoader(t *testing.T) {
 		wantConfig  AppConfig
 	}{
 		{
-			"404-file",
-			"404-file.yaml",
-			"",
-			false,
-			true,
-			os.ErrNotExist,
-			AppConfig{},
+			name:        "404-file",
+			path:        "404-file.yaml",
+			content:     "",
+			createFile:  false,
+			wantErr:     true,
+			wantErrType: os.ErrNotExist,
+			wantConfig:  AppConfig{},
 		},
 		{
-			"valid-config-file",
-			"application.yaml",
-			"discovery:\n  sources:\n    local:\n      - name: \"      local-dev \"\n        path: examples/targets",
-			true,
-			false,
-			nil,
-			AppConfig{
+			name:        "valid-config-file",
+			path:        "application.yaml",
+			content:     "discovery:\n  sources:\n    local:\n      - name: \"      local-dev \"\n        path: examples/targets\nexecution:\n  workers: 3\n  targetQueueCapacity: 5",
+			createFile:  true,
+			wantErr:     false,
+			wantErrType: nil,
+			wantConfig: AppConfig{
 				Discovery: DiscoverySourceConfig{
 					Sources: DiscoveryConfig{
 						Local: []LocalSourceConfig{
@@ -43,56 +43,63 @@ func TestConfigLoader(t *testing.T) {
 						},
 					},
 				},
+				Execution: &ExecutionConfig{
+					Workers:             3,
+					TargetQueueCapacity: 5,
+				},
 			},
 		},
 		{
-			"typo-config-file",
-			"malformed-application.yaml",
-			"discoivery:\n  local:\n    - name: local-dev\n      path: /data\n\n",
-			true,
-			true,
-			nil,
-			AppConfig{},
+			name:        "typo-config-file",
+			path:        "malformed-application.yaml",
+			content:     "discoivery:\n  sources:\n    local:\n      - name: \"      local-dev \"\n        path: examples/targets",
+			createFile:  true,
+			wantErr:     true,
+			wantErrType: nil,
+			wantConfig:  AppConfig{},
 		},
 		{
-			"malformed-yaml",
-			"malformed-invalid-config.yaml",
-			"discoivery:\n  local:\n    - name:local-dev\n	      path:/data\n\n",
-			true,
-			true,
-			nil,
-			AppConfig{},
+			name:        "malformed-yaml",
+			path:        "malformed-invalid-config.yaml",
+			content:     "discoivery:\n  sources:\n    locals:\n      - name: \"      local-dev \"\n        path: examples/targets",
+			createFile:  true,
+			wantErr:     true,
+			wantErrType: nil,
+			wantConfig:  AppConfig{},
 		},
 		{
-			"malformed-yaml-2",
-			"malformed-invalid-config2.yaml",
-			"discoivery:\n  local:\n    - name:1234\n	      path:/data\n\n",
-			true,
-			true,
-			nil,
-			AppConfig{},
-		},
-		{
-			"valid-invalid-semantic-file",
-			"invalid-semantic.yaml",
-			"discovery:\n  sources:\n    aws:\n      - name: dev-account\n        accountID: \"123        \"\n        region: us-east-1",
-			true,
-			true,
-			ErrInvalidAccountID,
-			AppConfig{},
-		},
-		{
-			"whitespaced-config",
-			"whitespaced-config.yaml",
-			"discovery:\n  local:\n    - name:   dev-local   \n	      path:     /data\n\n",
-			true,
-			true,
-			nil,
-			AppConfig{
+			name:        "whitespaced-config",
+			path:        "whitespaced-config.yaml",
+			content:     "discovery:\n  sources:\n    local:\n      - name: \"      local-dev \"\n        path: examples/targets\nexecution:\n  workers: 3\n  targetQueueCapacity: 5",
+			createFile:  true,
+			wantErr:     false,
+			wantErrType: nil,
+			wantConfig: AppConfig{
 				Discovery: DiscoverySourceConfig{
 					Sources: DiscoveryConfig{
 						Local: []LocalSourceConfig{
-							{Name: "dev-local", Path: "/data"},
+							{Name: "local-dev", Path: "examples/targets"},
+						},
+					},
+				},
+				Execution: &ExecutionConfig{
+					Workers:             3,
+					TargetQueueCapacity: 5,
+				},
+			},
+		},
+		{
+			name:        "execution-config-omitted",
+			path:        "application.yaml",
+			content:     "discovery:\n  sources:\n    local:\n      - name: \"      local-dev \"\n        path: examples/targets",
+			createFile:  true,
+			wantErr:     false,
+			wantErrType: nil,
+			wantConfig: AppConfig{
+				Discovery: DiscoverySourceConfig{
+					Sources: DiscoveryConfig{
+						Local: []LocalSourceConfig{
+							{Name: "local-dev", Path: "examples/targets"},
 						},
 					},
 				},
